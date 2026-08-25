@@ -1,0 +1,62 @@
+USE mdb;
+SET NOCOUNT ON;
+
+DECLARE @HorasBrasilParaUTC int = 3;
+DECLARE @Epoch              datetime2(0) = '1970-01-01 00:00:00';
+
+DECLARE @InicioAnoBR  datetime2(0) = '2025-03-01 00:00:00';
+DECLARE @FimAnoBR     datetime2(0) = '2026-03-31 23:59:59';
+
+DECLARE @InicioUTC datetime2(0) = DATEADD(HOUR,  @HorasBrasilParaUTC, @InicioAnoBR);
+DECLARE @FimUTC    datetime2(0) = DATEADD(HOUR,  @HorasBrasilParaUTC, @FimAnoBR);
+
+DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, @InicioUTC);
+DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, @FimUTC);
+
+IF OBJECT_ID('tempdb..#Abertos') IS NOT NULL DROP TABLE #Abertos;
+
+-- Popula a tabela temporária com os dados do COI (Nova e Velha) e busca o Responsável
+SELECT
+    r.id,
+    r.ref_num,
+    r.summary,
+    r.[type],
+    r.open_date,
+    c.combo_name AS Responsavel,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, r.open_date, @Epoch)) AS open_br
+INTO #Abertos
+FROM dbo.call_req AS r
+LEFT JOIN dbo.ca_contact AS c ON r.assignee = c.contact_uuid
+WHERE r.group_id IN (
+    0x3C11B3A9EBCE5D498E2F7D7FF385F967, -- Fila nova: COI
+    0xDA7095D797E3FE498A62B79CB7EAED15  -- Fila velha: Contrato 7/2023 - COI
+)
+  AND r.[type] IN ('I', 'R')
+  AND r.open_date IS NOT NULL
+  AND r.open_date >= @InicioEpoch
+  AND r.open_date <= @FimEpoch;
+
+--------------------------------------------------------------------------------
+-- 1º RESULTADO: Resumo de Chamados por Responsável
+--------------------------------------------------------------------------------
+SELECT
+    ISNULL(a.Responsavel, 'Não Atribuído') AS Responsaveis,
+    COUNT(*)                               AS Registrados
+FROM #Abertos AS a
+GROUP BY
+    ISNULL(a.Responsavel, 'Não Atribuído')
+ORDER BY
+    Registrados DESC,
+    Responsaveis ASC;
+
+--------------------------------------------------------------------------------
+-- 2º RESULTADO: Visão Detalhada (Número, Resumo, Data e Responsável)
+--------------------------------------------------------------------------------
+SELECT
+    a.ref_num                               AS NumeroChamado,
+    a.summary                               AS Resumo,
+    a.[type]                                AS Tipo,
+    a.open_br                               AS DataAberturaBR,
+    ISNULL(a.Responsavel, 'Não Atribuído')  AS Responsavel
+FROM #Abertos AS a
+ORDER BY a.open_date DESC;
