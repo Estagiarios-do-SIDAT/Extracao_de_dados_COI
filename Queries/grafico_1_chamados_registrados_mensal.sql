@@ -17,8 +17,8 @@ DECLARE @HorasBrasilParaUTC int = 3;
 DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
 
 -- Período analisado (Aplicado para TODAS as janelas)
-DECLARE @InicioBR datetime2(0) = '2026-01-09 00:00:00';   -- INCLUSIVO
-DECLARE @FimBR    datetime2(0) = '2026-01-31 00:00:00';   -- EXCLUSIVO
+DECLARE @InicioBR datetime2(0) = '2026-03-09 00:00:00';   -- INCLUSIVO
+DECLARE @FimBR    datetime2(0) = '2026-03-31 23:59:59';   -- EXCLUSIVO
 
 DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
 DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
