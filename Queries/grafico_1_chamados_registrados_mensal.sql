@@ -5,10 +5,10 @@ SET NOCOUNT ON;
 -- [CONFIGURACAO DAS JANELAS DE RESULTADO]
 -- 1 = retorna a janela; 0 = nao retorna.
 --------------------------------------------------------------------------------
-DECLARE @ResultadoTudo    bit = 1;
+DECLARE @ResultadoTudo   bit = 1;
 
-DECLARE @G1_Mensal        bit = 1; -- Janela do Gráfico 1: Mensal (Volumetria)
-DECLARE @Detalhes         bit = 0; -- Janela de Auditoria: Detalhe linha a linha
+DECLARE @G1_Mensal       bit = 1; -- Janela do Gráfico 1: Mensal (Volumetria)
+DECLARE @Detalhes        bit = 1; -- Janela de Auditoria: Detalhe linha a linha
 
 --------------------------------------------------------------------------------
 -- [0] PARAMETROS GERAIS UNIFICADOS
@@ -31,7 +31,6 @@ DECLARE @HorizonteMensal bit = 1;
 
 --------------------------------------------------------------------------------
 -- MOTOR CENTRAL: REGRA CANONICA DE REGISTRADOS COI
--- Identifica se o chamado NASCEU no COI ou FOI TRANSFERIDO para o COI.
 --------------------------------------------------------------------------------
 
 -- [R1] Aliases históricos confirmados da fila
@@ -41,13 +40,28 @@ INSERT INTO #AliasCOI (nome_norm) VALUES (N'COI'), (N'CONTRATO 7/2023 - COI');
 
 -- [R2] Universo: abertos na janela, tipo I/R
 IF OBJECT_ID('tempdb..#RegCand') IS NOT NULL DROP TABLE #RegCand;
+CREATE TABLE #RegCand (
+    id          int            NOT NULL,
+    persid      nvarchar(64)   COLLATE DATABASE_DEFAULT NULL,
+    ref_num     nvarchar(64)   COLLATE DATABASE_DEFAULT NULL,
+    resumo      nvarchar(4000) COLLATE DATABASE_DEFAULT NULL, -- Estruturado ao lado do ref_num
+    tipo        char(1)        COLLATE DATABASE_DEFAULT NULL,
+    group_id    varbinary(16)  NULL,
+    open_date   int            NULL,
+    log_agent   varbinary(16)  NULL,
+    abertura_br datetime2(0)   NULL,
+    fim_excl    int            NULL
+);
+
+INSERT INTO #RegCand (id, persid, ref_num, resumo, tipo, group_id, open_date, log_agent, abertura_br, fim_excl)
 SELECT
-    r.id, r.persid, r.ref_num, r.[type] AS tipo, r.group_id, r.open_date, r.log_agent, br.abertura_br,
+    r.id, r.persid, r.ref_num, 
+    r.summary AS resumo,
+    r.[type] AS tipo, r.group_id, r.open_date, r.log_agent, br.abertura_br,
     CASE WHEN @HorizonteMensal = 1
          THEN DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, DATEADD(MONTH, DATEDIFF(MONTH, 0, br.abertura_br) + 1, 0)))
          ELSE @FimEpoch
     END AS fim_excl
-INTO #RegCand
 FROM dbo.call_req AS r
 CROSS APPLY (SELECT abertura_br = DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, r.open_date, @Epoch))) AS br
 WHERE r.[type] IN ('I', 'R')
@@ -58,7 +72,7 @@ OPTION (RECOMPILE);
 CREATE UNIQUE CLUSTERED INDEX IX_RegCand_id ON #RegCand(id);
 CREATE INDEX IX_RegCand_persid ON #RegCand(persid);
 
--- [R3] Leitura dos logs de transferência (Garante que capta quem passou pelo COI)
+-- [R3] Leitura dos logs de transferência
 IF OBJECT_ID('tempdb..#RegAtos') IS NOT NULL DROP TABLE #RegAtos;
 SELECT
     c.id, al.system_time,
@@ -67,6 +81,7 @@ INTO #RegAtos
 FROM #RegCand AS c
 JOIN dbo.act_log AS al ON al.call_req_id = c.persid AND al.[type] = 'TR' AND al.system_time IS NOT NULL
 OPTION (RECOMPILE);
+
 CREATE CLUSTERED INDEX IX_RegAtos ON #RegAtos(id, system_time);
 
 -- [R4] Âncora de GRUPO e Parsing do Histórico
@@ -77,6 +92,7 @@ FROM #RegAtos AS a
 CROSS APPLY (SELECT p1 = CHARINDEX(N'Grupo de', a.texto), p2 = CHARINDEX(N'Grupo alterado de', a.texto), p3 = CHARINDEX(N'Grupo transferido de', a.texto), p4 = CHARINDEX(N'Group from', a.texto), p5 = CHARINDEX(N'Group changed from', a.texto)) AS pos
 CROSS APPLY (SELECT posicao = CASE WHEN pos.p1 > 0 THEN pos.p1 + 8 WHEN pos.p2 > 0 THEN pos.p2 + 17 WHEN pos.p3 > 0 THEN pos.p3 + 20 WHEN pos.p4 > 0 THEN pos.p4 + 10 WHEN pos.p5 > 0 THEN pos.p5 + 18 ELSE 0 END) AS anc
 WHERE anc.posicao > 0;
+
 CREATE CLUSTERED INDEX IX_RegRaw ON #RegRaw(id, system_time);
 
 -- [R5] Normalização de Origem e Destino
@@ -95,15 +111,31 @@ CROSS APPLY (SELECT q3 = CASE WHEN sep.posicao > 0 THEN CHARINDEX(N'''', g.resto
 CROSS APPLY (SELECT q4 = CASE WHEN c3.q3 > 0 THEN CHARINDEX(N'''', g.resto, c3.q3 + 1) ELSE 0 END) AS c4
 CROSS APPLY (SELECT nome = CASE WHEN c4.q4 > c3.q3 THEN SUBSTRING(g.resto, c3.q3 + 1, c4.q4 - c3.q3 - 1) ELSE N'' END) AS des
 WHERE c1.q1 > 0 AND c2.q2 > c1.q1 AND sep.posicao > 0 AND c3.q3 > 0 AND c4.q4 > c3.q3;
+
 CREATE CLUSTERED INDEX IX_RegEv ON #RegEv(id, evento);
 
--- [R6] Classificação (Filtra para deixar apenas o que passou no COI)
+-- [R6] Classificação
 IF OBJECT_ID('tempdb..#Registrados') IS NOT NULL DROP TABLE #Registrados;
+CREATE TABLE #Registrados (
+    id              int            NOT NULL,
+    SDM             nvarchar(64)   COLLATE DATABASE_DEFAULT NULL,
+    resumo          nvarchar(4000) COLLATE DATABASE_DEFAULT NULL, -- Estruturado ao lado do SDM
+    tipo            char(1)        COLLATE DATABASE_DEFAULT NULL,
+    abertura_br     datetime2(0)   NULL,
+    log_agent       varbinary(16)  NULL,
+    grupo_atual     varbinary(16)  NULL,
+    entrada_coi_br  datetime2(0)   NULL,
+    evidencia_coi   varchar(34)    COLLATE DATABASE_DEFAULT NULL,
+    alias_evidencia nvarchar(200)  COLLATE DATABASE_DEFAULT NULL
+);
+
+INSERT INTO #Registrados (id, SDM, resumo, tipo, abertura_br, log_agent, grupo_atual, entrada_coi_br, evidencia_coi, alias_evidencia)
 SELECT
-    c.id, c.ref_num AS SDM, c.tipo, c.abertura_br, c.log_agent, c.group_id AS grupo_atual, ent.entrada_br AS entrada_coi_br,
+    c.id, c.ref_num AS SDM, 
+    c.resumo, 
+    c.tipo, c.abertura_br, c.log_agent, c.group_id AS grupo_atual, ent.entrada_br AS entrada_coi_br,
     CONVERT(varchar(34), k.evidencia) COLLATE DATABASE_DEFAULT AS evidencia_coi,
-    CONVERT(nvarchar(200), k.alias_evid) COLLATE DATABASE_DEFAULT AS alias_evidencia
-INTO #Registrados
+    CONVERT(nvarchar(200), k.alias_evidencia) COLLATE DATABASE_DEFAULT AS alias_evidencia
 FROM #RegCand AS c
 OUTER APPLY (SELECT n = COUNT(*) FROM #RegEv AS e WHERE e.id = c.id) AS ev
 OUTER APPLY (SELECT TOP (1) e.origem_norm FROM #RegEv AS e WHERE e.id = c.id AND NULLIF(e.origem_norm, N'') IS NOT NULL ORDER BY e.evento, e.origem_norm) AS ini
@@ -111,10 +143,10 @@ OUTER APPLY (SELECT TOP (1) e.destino_norm, entrada_br = DATEADD(HOUR, -@HorasBr
 CROSS APPLY (SELECT ini_eh_coi = CASE WHEN EXISTS (SELECT 1 FROM #AliasCOI AS a WHERE a.nome_norm COLLATE Latin1_General_CI_AI = ini.origem_norm COLLATE Latin1_General_CI_AI) THEN 1 ELSE 0 END) AS f
 CROSS APPLY (SELECT
         evidencia = CASE WHEN f.ini_eh_coi = 1 THEN 'GRUPO_INICIAL' WHEN ent.destino_norm IS NOT NULL THEN 'TRANSFERENCIA_PARA_COI' WHEN ev.n = 0 AND c.group_id IN (@COI_Antigo, @COI_Novo) THEN 'FALLBACK_GRUPO_ATUAL_SEM_HISTORICO' ELSE 'NAO_ENTRA' END,
-        alias_evid = CASE WHEN f.ini_eh_coi = 1 THEN ini.origem_norm WHEN ent.destino_norm IS NOT NULL THEN ent.destino_norm WHEN ev.n = 0 AND c.group_id = @COI_Antigo THEN N'(fallback UUID COI_Antigo)' WHEN ev.n = 0 AND c.group_id = @COI_Novo THEN N'(fallback UUID COI_Novo)' ELSE NULL END) AS k
+        alias_evidencia = CASE WHEN f.ini_eh_coi = 1 THEN ini.origem_norm WHEN ent.destino_norm IS NOT NULL THEN ent.destino_norm WHEN ev.n = 0 AND c.group_id = @COI_Antigo THEN N'(fallback UUID COI_Antigo)' WHEN ev.n = 0 AND c.group_id = @COI_Novo THEN N'(fallback UUID COI_Novo)' ELSE NULL END) AS k
 WHERE k.evidencia <> 'NAO_ENTRA';
-CREATE CLUSTERED INDEX IX_Registrados ON #Registrados(id);
 
+CREATE CLUSTERED INDEX IX_Registrados ON #Registrados(id);
 
 --------------------------------------------------------------------------------
 -- [JANELA 1] MENSAL (GRÁFICO 1)
@@ -141,11 +173,10 @@ BEGIN
                SUM(CASE WHEN r.tipo = 'R' THEN 1 ELSE 0 END) AS Solicitacoes,
                COUNT(*) AS Total
         FROM #Registrados AS r
-        WHERE YEAR(r.abertura_br)  = m.Ano AND MONTH(r.abertura_br) = m.Mes
+        WHERE YEAR(r.abertura_br)   = m.Ano AND MONTH(r.abertura_br) = m.Mes
     ) AS agg
     ORDER BY m.Ano, m.Mes;
 END
-
 
 --------------------------------------------------------------------------------
 -- [JANELA 2] DETALHES (AUDITORIA LINHA A LINHA)
@@ -155,6 +186,7 @@ BEGIN
     SELECT 
         'Visão Detalhes (Auditoria)' AS Indicador,
         r.SDM,
+        r.resumo                                        AS Resumo, -- Posicionado na saída logo ao lado do SDM
         r.abertura_br                                   AS DataHoraRegistro,
         CONVERT(date, r.abertura_br)                    AS DataRegistro,
         DATEPART(HOUR, r.abertura_br)                   AS HoraRegistro,
