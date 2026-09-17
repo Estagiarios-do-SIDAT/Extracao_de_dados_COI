@@ -1,0 +1,968 @@
+USE mdb;
+SET NOCOUNT ON;
+
+/*
+================================================================================
+COI - Chamados REGISTRADOS por mes (Incidentes x Solicitacoes)
+================================================================================
+
+Indicador: Grafico 1 - Chamados Registrados pelo COI, por mes, separando I e R.
+
+Saida: UM unico result set.
+    Ano, Mes, MesAno, Incidentes, Solicitacoes, Total
+
+REGRA DE "REGISTRADO PELO COI" - canonica, baseada no sistema fonte
+
+    type IN ('I','R')
+    E  PRIMEIRA ENTRADA NA FILA DO COI, em toda a vida do chamado, caindo
+       dentro da janela consultada
+    -> uma linha por SDM, sem filtro de analista, categoria, motivo ou status.
+
+    O eixo NAO e call_req.open_date: e a DataRegistroCOI reconstruida. Um SDM
+    conta UMA vez, na primeira entrada; reentrada nao conta de novo.
+
+    A evidencia PRINCIPAL e a cadeia real de mudancas de grupo em act_log. O
+    '%GROUP=' do INIT e apenas AUXILIAR - ha chamados cujo INIT declara uma fila
+    que a primeira mudanca de grupo contradiz, e nesses a cadeia vence. Quando
+    nao existe NENHUM evento de grupo, aplica-se o fallback de estado autorizado
+    pela gestao do COI: a fila em que o chamado permaneceu.
+
+    O detalhamento, os aliases historicos, a janela de transicao de contrato e o
+    motivo de cada decisao estao no bloco delimitado por INICIO/FIM REGRA
+    CANONICA DE REGISTRADOS COI, IDENTICO byte a byte nas SETE consultas de
+    Registrados e conferivel por SHA256.
+
+O RSP HISTORICO NAO E O ALVO
+
+    Os relatorios antigos do fornecedor vieram de OUTRA ferramenta/base, o
+    proprio fornecedor confirmou inconsistencias, e a aba DADOS guarda apenas
+    valores digitados - sem pivot, conexao ou formula que revele a regra. Eles
+    valem como referencia externa de reconciliacao; a definicao tecnica do
+    indicador e esta consulta, sobre o sistema fonte atual.
+
+    Nenhum filtro aqui existe para aproximar numero de relatorio antigo.
+
+LIMITE CONHECIDO - historico nao e imutavel
+
+    Uma execucao de hoje pode divergir de um relatorio emitido meses atras se
+    chamados foram corrigidos ou incluidos depois com open_date retroativo. O
+    horizonte de elegibilidade impede que MOVIMENTACAO posterior mude um periodo
+    fechado, mas nao reconstroi um snapshot antigo. Se for exigido que meses
+    fechados nunca mudem, o caminho e snapshot mensal persistido no fechamento -
+    decisao de projeto, nao implementada aqui.
+
+Somente leitura. Batch unico. Nao existe GO neste arquivo.
+================================================================================
+*/
+
+--------------------------------------------------------------------------------
+-- [0] PARAMETROS
+--
+-- Datas em horario do Brasil. Intervalo SEMIABERTO: >= inicio e < fim.
+-- Nao usar 23:59:59 como fim: o chamado do ultimo segundo do dia ficaria de fora.
+--
+-- open_date e close_date em dbo.call_req sao epoch UTC em segundos (int).
+-- Brasil = UTC-3 fixo (sem horario de verao desde 2019), mesma conversao ja
+-- validada em decision/ e protect4/.
+--------------------------------------------------------------------------------
+DECLARE @HorasBrasilParaUTC int = 3;
+DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
+
+-- Periodo analisado. Altere apenas estas duas linhas.
+DECLARE @InicioBR datetime2(0) = '2026-02-01 00:00:00';   -- inclusivo
+DECLARE @FimBR    datetime2(0) = '2026-03-01 00:00:00';   -- EXCLUSIVO
+
+DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
+DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
+
+
+--------------------------------------------------------------------------------
+-- INICIO REGRA CANONICA DE REGISTRADOS COI
+--
+-- Bloco IDENTICO, byte a byte, nas SETE consultas de Registrados:
+--     INDICADORES
+--       consulta_coi_registrados_mensal.sql
+--       consulta_coi_registrados_encerrados_diario.sql
+--       consulta_coi_registrados_por_hora.sql
+--     AUDITORIA
+--       consulta_coi_registrados_detalhe.sql
+--       consulta_coi_registrados_por_registrador.sql
+--       consulta_coi_registrados_por_evidencia.sql
+--       consulta_coi_registrados_validacao.sql
+--
+-- Conferir com SHA256 do trecho entre os marcadores. Nao basta parecerem iguais.
+--
+-- A REGRA
+--
+--   Um SDM e Registrado pelo COI quando ENTRA NO COI PELA PRIMEIRA VEZ NA VIDA
+--   do chamado. Cada SDM produz UMA data:
+--
+--       DataRegistroCOI
+--
+--   e os indicadores mensal, diario e por hora sao agrupados por ela - NAO por
+--   call_req.open_date. Um SDM conta UMA vez. Reentrada nao gera novo registro.
+--
+-- O QUE MUDOU: O INIT DEIXOU DE SER A EVIDENCIA PRINCIPAL
+--
+--   A versao anterior consultava primeiro o '%GROUP=' do evento INIT e, se ele
+--   fosse alias do COI, fixava DataRegistroCOI = open_date sem olhar a cadeia.
+--   Isso foi REFUTADO por dados: existem chamados cujo INIT declara '10-COI' e
+--   cuja primeira mudanca real de grupo prova que eles estavam em OUTRA fila.
+--
+--       1686505  INIT='10-COI'  aberto 18/03 22:08:45
+--                1o evento: GESTAO DE SUPORTE REMOTO -> COI  em 22:09:37
+--
+--   O chamado nao foi aberto no COI as 22:08:45. Ele ENTROU no COI as 22:09:37.
+--   O INIT carrega o grupo PEDIDO no template da automacao, que pode nao ser o
+--   grupo em que o chamado efetivamente nasceu.
+--
+--   Por isso a hierarquia se inverteu. O INIT continua no resultado, como
+--   evidencia AUXILIAR e auditavel (colunas GrupoInit e
+--   InitConsistenteComReconstrucao), mas NAO decide mais a data.
+--
+-- HIERARQUIA DE EVIDENCIA - determinista, uma evidencia por SDM
+--
+--   1. CADEIA REAL DE MUDANCAS DE GRUPO - evidencia principal
+--
+--      ABERTO_NO_COI_CADEIA
+--          a ORIGEM do primeiro evento real de grupo pertence ao universo
+--          logico COI -> DataRegistroCOI = open_date
+--          Nao havendo mudanca de grupo anterior, o chamado ja estava no COI
+--          antes da primeira transferencia observada.
+--
+--      TRANSFERIDO_PARA_COI
+--          a origem do primeiro evento e legivel e NAO e COI: o chamado nasceu
+--          fora -> DataRegistroCOI = primeiro evento cujo DESTINO e COI
+--
+--      JA_ESTAVA_NO_COI_HISTORICO
+--          a origem do primeiro evento e 'CONTRATO 7/2023 - COI', o chamado foi
+--          aberto ANTES da transicao, o %GROUP= do INIT nao aponta fila nao-COI
+--          e nao ha ancora de grupo ilegivel antes do primeiro evento legivel
+--          -> DataRegistroCOI = open_date
+--
+--          Esse nome e o rotulo POSTERIOR da fila que, antes da transicao, se
+--          chamava 'COI'. O act_log grava o nome vigente NO INSTANTE DO EVENTO,
+--          entao um chamado de 2023 que so se move em 2026 tem o evento gravado
+--          com o nome novo da fila velha. Ler isso como "entrou no COI agora"
+--          apaga a entrada historica e joga o SDM para outro mes.
+--
+--          Caso 1419597: aberto em 2023-05-29, primeiro evento em jun/2026 com
+--          origem 'CONTRATO 7/2023 - COI' e destino 'COI'. A primeira entrada e
+--          2023, nao junho de 2026.
+--
+--          AS DUAS TRAVAS, e por que existem. A origem so prova que o SDM estava
+--          naquela fila IMEDIATAMENTE ANTES da transferencia - nao que estava la
+--          desde a abertura. Entre a abertura e o primeiro evento observavel
+--          pode ter havido movimentacao que o log nao mostra. Entao:
+--
+--            1. se o %GROUP= do INIT nomeia uma fila NAO-COI, ele e evidencia
+--               direta e contemporanea de que o chamado nasceu fora. Datar em
+--               open_date afirmaria um nascimento que o proprio registro de
+--               abertura nega -> CONTRADICAO_INIT_x_CADEIA, ressalva.
+--
+--               A compatibilidade aqui e TEMPORAL, nao apenas nominal. Para
+--               abertura anterior a transicao, so 'COI' e '10-COI' sao INIT
+--               compativeis - e '10-COI' entra porque tem evento operacional
+--               real desde 13/02/2026. 'CONTRATO 7/2023 - COI' NAO e: esse nome
+--               so passa a existir NA transicao, e o INIT e escrito na criacao.
+--               Encontra-lo num chamado aberto antes e anomalia a auditar, nao
+--               evidencia de pertencimento
+--               -> INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA, ressalva.
+--
+--               Note que #AliasInit NAO serve de trava aqui, embora sirva a
+--               auditoria geral do rotulo: ela inclui o nome do contrato, e
+--               usa-la deixaria passar exatamente o caso anomalo.
+--            2. se existe ancora de grupo ILEGIVEL antes do primeiro evento
+--               legivel, esse evento pode nao ser o primeiro da vida, e a
+--               origem dele nao descreve a abertura
+--               -> SEM_RECONSTRUCAO_EVENTO_ILEGIVEL, ressalva.
+--
+--          Isto NAO devolve o INIT ao topo da hierarquia. Ele nao escolhe data
+--          em ramo nenhum; aqui ele so IMPEDE uma inferencia que o contradiz.
+--
+--      ENTRADA_DEMONSTRAVEL_DESTINO
+--          a origem do primeiro evento nao prova a primeira entrada, mas existe
+--          evento com DESTINO COI -> DataRegistroCOI = esse evento
+--
+--          A origem pode falhar de duas maneiras, e as duas caem aqui:
+--            ilegivel no TEXTO      "'' -> COI" (caso 1686579)
+--            ilegivel no SIGNIFICADO origem 'CONTRATO 7/2023 - COI' em chamado
+--                                    aberto DENTRO da janela de renomeacao, em
+--                                    que nao se sabe sob que nome aquele UUID
+--                                    operava
+--
+--          Nos dois casos a ENTRADA e demonstravel naquele instante, e so a
+--          antecipacao para open_date e que fica impedida - antecipar seria
+--          afirmar um nascimento que o log nao mostra.
+--
+--   2. FALLBACK DE ESTADO - autorizado pelo gerente, SO sem cadeia utilizavel
+--
+--      ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL
+--          nenhum evento de grupo em toda a vida, e group_id atual = COI novo
+--          -> DataRegistroCOI = open_date
+--          "sem log de mudanca, considerar a fila em que o chamado permaneceu"
+--
+--      ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO
+--          nenhum evento de grupo, group_id atual = COI antigo, e o chamado foi
+--          aberto ANTES da transicao -> DataRegistroCOI = open_date
+--          Reconstrucao historica: quando ele nasceu, aquele UUID se chamava
+--          'COI' e era a fila do COI.
+--
+--   3. FORA DO INDICADOR, mas VISIVEL em #RegRessalvas
+--
+--      SEM_RECONSTRUCAO_EVENTO_ILEGIVEL
+--          existe evento com ancora de grupo, mas NENHUM legivel. Nao se pode
+--          reconstruir a cadeia - e nao se pode cair no fallback, porque houve
+--          movimentacao. Contar aqui seria afirmar permanencia onde houve
+--          movimento que nao sabemos ler.
+--
+--      CONTRADICAO_INIT_x_CADEIA
+--          a origem historica sugere pertencimento ao COI, mas o %GROUP= do
+--          INIT nomeia explicitamente uma fila nao-COI. As duas evidencias se
+--          contradizem e a entrada correta nao e demonstravel. Vai para
+--          auditoria em vez de receber open_date inventado.
+--
+--      INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA
+--          o chamado abriu ANTES da transicao mas o %GROUP= do INIT ja traz
+--          'CONTRATO 7/2023 - COI', nome que a fila so recebeu DEPOIS. O
+--          registro de abertura nao pode conhecer um nome futuro: ou a linha
+--          INIT nao descreve a criacao, ou a data de abertura nao e a que
+--          parece. Qualquer das duas invalida a inferencia historica.
+--
+--      AMBIGUO_JANELA_TRANSICAO
+--          abertura DENTRO da janela de renomeacao E nenhuma entrada
+--          demonstravel em fila COI. Duas formas:
+--            sem cadeia, group_id atual = COI antigo - o UUID antigo sozinho
+--              nao data a abertura ali;
+--            com cadeia cuja origem e 'CONTRATO 7/2023 - COI' mas sem nenhum
+--              evento com destino COI.
+--
+--          A ressalva EXIGE ausencia de entrada demonstravel. Ela existe para o
+--          caso "nao sei SE entrou", nao para "nao sei QUANDO entrou". Havendo
+--          evento com destino em fila COI, o SDM entra pelo ramo
+--          ENTRADA_DEMONSTRAVEL_DESTINO, datado nesse evento.
+--
+--      NAO_ENTRA
+--          cadeia existe e nunca toca o COI, ou estado atual nao e COI.
+--          Descartado antes de #RegBase.
+--
+--   A ordem importa: a cadeia real e consultada PRIMEIRO e vence sempre. O
+--   fallback so e alcancado quando nao existe NENHUM evento de grupo.
+--
+-- UNIVERSO LOGICO COI NOS EVENTOS REAIS
+--
+--   Aceitos:      COI      e  10-COI
+--   NAO aceito:   CONTRATO 7/2023 - COI
+--
+--   '10-COI' entra porque a serie temporal provou que sua atuacao operacional
+--   real ficou restrita ao periodo de transicao:
+--
+--       como destino: 2026-02-13 16:45:06  ate  2026-03-18 19:29:11
+--       como origem : 2026-02-27 16:40:06  ate  2026-03-18 20:35:51
+--
+--   Nenhum evento real com '10-COI' depois disso. Ele foi, temporariamente, o
+--   nome da fila do COI - e nesse intervalo transferir para '10-COI' era
+--   transferir para o COI.
+--
+--   'CONTRATO 7/2023 - COI' e ASSIMETRICO, e essa e a correcao mais importante
+--   desta regra. Ele vale conforme a POSICAO que ocupa no evento:
+--
+--     como DESTINO, depois da transicao        NAO cria entrada
+--         'OUTRA FILA' -> 'CONTRATO 7/2023 - COI' e movimentacao para a fila do
+--         contrato ENCERRADO. Nao e entrada no COI corrente. Por isso o nome
+--         NAO esta em #AliasCOI, que so decide destino.
+--
+--     como ORIGEM, em chamado aberto ANTES da transicao   PROVA pertencimento
+--         'CONTRATO 7/2023 - COI' -> 'COI' diz que, imediatamente antes dessa
+--         transferencia, o SDM ja estava na fila que naquela epoca se chamava
+--         'COI'. Ele ja era do universo logico COI. A primeira entrada e a
+--         abertura, nao essa transferencia.
+--
+--   A assimetria existe porque um evento POSTERIOR a renomeacao registra a
+--   origem pelo nome vigente NAQUELE momento. Logo, o primeiro evento historico
+--   disponivel pode mostrar o nome NOVO de uma fila na qual o chamado ja estava
+--   ANTES da renomeacao.
+--
+--   Nenhuma linha antiga do act_log e alterada: as linhas gravadas antes da
+--   troca continuam com o nome antigo. O que muda e o nome usado pelas linhas
+--   gravadas DEPOIS. Ler origem e destino com o mesmo criterio confunde as duas
+--   coisas.
+--
+--   RESTRICAO: a leitura da origem exige abertura ANTES da transicao. Um chamado
+--   aberto DEPOIS dela cujo primeiro evento parte de 'CONTRATO 7/2023 - COI'
+--   nasceu mesmo na fila do contrato encerrado - ali o nome nao e rotulo
+--   retroativo, e a fila de verdade. Esse cai nos ramos normais de entrada por
+--   destino. Aberto DENTRO da janela: ressalva.
+--
+--   O nome 'COI' vale nos DOIS lados da troca. Ele mudou de UUID, mas nao de
+--   significado de negocio: dos dois lados ele designa a fila do COI. Como o
+--   indicador mede primeira entrada no universo logico COI, e nao pertencimento
+--   a um UUID, a troca de identidade do nome nao altera o indicador.
+--
+-- JANELA DE TRANSICAO
+--
+--       (2026-03-18 20:35:51 , 2026-03-18 21:48:58]
+--
+--   Extremos medidos: ultima aparicao operacional de '10-COI' e primeira de
+--   'CONTRATO 7/2023 - COI'. Como max(10-COI) < min(CONTRATO), nao ha
+--   intercalamento entre os dois nomes.
+--
+--   A janela impede INFERENCIA, nunca apaga EVIDENCIA. Dentro dela nao se sabe
+--   sob que nome o UUID antigo operava, entao nao se pode inferir pertencimento
+--   a partir da origem nem do estado atual - mas um evento com destino em fila
+--   COI continua provando a entrada, e com instante conhecido.
+--
+--   Por isso ela so exclui quando NAO ha entrada demonstravel. Confundir as
+--   duas coisas faria a regra responder "nao sei se entrou" quando o log diz
+--   "entrou as 21:48:58, so nao sei se ja estava antes".
+--
+-- REENTRADAS - uma contagem por SDM
+--
+--   DataRegistroCOI e a PRIMEIRA entrada da vida. A busca varre a vida inteira
+--   do chamado, sem recorte de janela; so depois a janela filtra. Se o SDM
+--   entrou no COI em janeiro, saiu e voltou em fevereiro, ele e de janeiro e
+--   nao reaparece em fevereiro.
+--
+--   Movimentos COI -> 10-COI e 10-COI -> COI sao movimentacao INTERNA do
+--   universo logico e nao geram entrada nova: ambos os nomes estao em
+--   #AliasCOI, entao a origem do primeiro evento ja e COI e o SDM fica com
+--   open_date pelo ramo ABERTO_NO_COI_CADEIA.
+--
+-- CANDIDATOS - por EVENTO, nunca por idade do chamado
+--
+--   Para uma DataRegistroCOI cair dentro da janela, so existem dois caminhos:
+--
+--     A) o chamado ABRIU dentro da janela (nasceu no COI, entrou nela, ou caiu
+--        no fallback de estado - todos dao DataRegistroCOI = open_date);
+--     B) houve ENTRADA no COI dentro da janela, qualquer que seja a idade.
+--
+--   Entao o universo e A UNIAO B. Um chamado aberto ha dois anos em outro
+--   nucleo, transferido ao COI ontem, entra por B - sem horizonte de abertura.
+--
+--   Isto NAO e otimizacao: e a diferenca entre "primeira entrada da vida" e
+--   "primeira entrada entre os chamados que resolvemos carregar". Um recorte
+--   por open_date nao pode ser validado por contador nenhum, porque o que ele
+--   exclui fica de fora ANTES de existir para ser contado.
+--
+-- IDENTIDADE HISTORICA - por texto, nunca por UUID atual
+--
+--   O act_log grava o grupo por NOME textual historico. Resolver esse nome
+--   contra o cadastro ATUAL reescreve o passado com o presente. Por isso os
+--   eventos sao decididos por tabela EXPLICITA de aliases, e nao por JOIN em
+--   ca_contact nem por LIKE '%COI%'. O UUID so aparece no fallback, que e
+--   justamente o ramo em que nao ha texto historico para ler.
+--
+-- CONTAS TECNICAS NAO SAO CRITERIO
+--
+--   ServiceDesk, usr_automacoes e sesuc_auto sao compartilhadas com outros
+--   nucleos. Nenhuma delas aparece nesta regra. log_agent viaja junto SO PARA
+--   AUDITORIA e nao entra em nenhum predicado.
+--------------------------------------------------------------------------------
+
+-- [R0] Identidade da fila COI e janela de transicao.
+--      Nomes proprios (@COI_UUID_*) para nao colidir com @COI_Antigo/@COI_Novo
+--      que alguns arquivos ja declaram para o lado de Encerrados.
+DECLARE @COI_UUID_Antigo varbinary(16) = 0xDA7095D797E3FE498A62B79CB7EAED15;  -- hoje 'CONTRATO 7/2023 - COI'
+DECLARE @COI_UUID_Novo   varbinary(16) = 0x3C11B3A9EBCE5D498E2F7D7FF385F967;  -- hoje 'COI'
+
+DECLARE @TransIniBR datetime2(0) = '2026-03-18 20:35:51';  -- ultimo evento real '10-COI'
+DECLARE @TransFimBR datetime2(0) = '2026-03-18 21:48:58';  -- 1o evento real 'CONTRATO 7/2023 - COI'
+DECLARE @TransIniEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @TransIniBR));
+DECLARE @TransFimEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @TransFimBR));
+
+-- [R1] Universo logico COI nos EVENTOS REAIS de grupo. Tabela explicita.
+--      'CONTRATO 7/2023 - COI' NAO esta aqui: ver o bloco de documentacao.
+IF OBJECT_ID('tempdb..#AliasCOI') IS NOT NULL DROP TABLE #AliasCOI;
+CREATE TABLE #AliasCOI (nome_norm nvarchar(200) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY);
+INSERT INTO #AliasCOI (nome_norm) VALUES (N'COI'), (N'10-COI');
+
+-- [R1b] Nomes considerados COI APENAS para auditar o %GROUP= do INIT. Inclui o
+--       nome do contrato antigo porque aqui o objetivo e medir consistencia do
+--       rotulo, nao decidir pertencimento. Esta tabela NAO entra em nenhuma
+--       decisao de DataRegistroCOI.
+IF OBJECT_ID('tempdb..#AliasInit') IS NOT NULL DROP TABLE #AliasInit;
+CREATE TABLE #AliasInit (nome_norm nvarchar(200) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY);
+INSERT INTO #AliasInit (nome_norm) VALUES (N'COI'), (N'10-COI'), (N'CONTRATO 7/2023 - COI');
+
+-- [R2a] CONJUNTO A - chamados I/R abertos DENTRO da janela.
+--       open_date e type crus: sargaveis.
+IF OBJECT_ID('tempdb..#CandA') IS NOT NULL DROP TABLE #CandA;
+
+SELECT r.id, r.persid
+INTO #CandA
+FROM dbo.call_req AS r
+WHERE r.[type] IN ('I', 'R')
+  AND r.open_date >= @InicioEpoch
+  AND r.open_date <  @FimEpoch
+OPTION (RECOMPILE);
+
+CREATE UNIQUE CLUSTERED INDEX IX_CandA ON #CandA(id);
+
+-- [R2b] CONJUNTO B - chamados que RECEBERAM entrada no COI dentro da janela,
+--       com QUALQUER idade de abertura.
+--
+--       Aqui o act_log e filtrado por system_time, e nao por call_req_id. Se
+--       nao houver indice temporal em act_log, este passo e uma varredura da
+--       tabela, e o custo esta assumido. A alternativa seria recortar por data
+--       de abertura - e era exatamente isso que tornava a regra falsa.
+--
+--       O LIKE '%COI%' e PRE-FILTRO, nao criterio: 'COI' e '10-COI' contem essa
+--       substring, entao ele nao pode perder linha. Serve so para nao levar a
+--       tempdb o texto de toda transferencia da janela. Quem decide e a ancora
+--       de grupo e o par de aspas, logo abaixo.
+IF OBJECT_ID('tempdb..#EvJanela') IS NOT NULL DROP TABLE #EvJanela;
+
+SELECT
+    al.call_req_id,
+    (CONVERT(nvarchar(max), ISNULL(al.description, N'')) + N' ' +
+     CONVERT(nvarchar(max), ISNULL(al.action_desc,  N'')))
+        COLLATE Latin1_General_CI_AI AS texto
+INTO #EvJanela
+FROM dbo.act_log AS al
+WHERE al.[type] = 'TR'
+  AND al.system_time >= @InicioEpoch
+  AND al.system_time <  @FimEpoch
+  AND (al.description COLLATE Latin1_General_CI_AI LIKE N'%COI%'
+    OR al.action_desc COLLATE Latin1_General_CI_AI LIKE N'%COI%')
+OPTION (RECOMPILE);
+
+CREATE CLUSTERED INDEX IX_EvJanela ON #EvJanela(call_req_id);
+
+-- Dos eventos da janela, so os que sao mesmo mudanca de GRUPO com destino COI.
+-- "Transferir Responsavel de 'A' para 'B'" grava o mesmo tipo 'TR' e NAO casa
+-- com nenhuma das cinco ancoras: troca de analista nao e troca de fila.
+IF OBJECT_ID('tempdb..#CandB') IS NOT NULL DROP TABLE #CandB;
+
+SELECT DISTINCT r.id, r.persid
+INTO #CandB
+FROM #EvJanela AS a
+JOIN dbo.call_req AS r
+    ON a.call_req_id = r.persid
+CROSS APPLY (SELECT p1 = CHARINDEX(N'Grupo de',             a.texto),
+                    p2 = CHARINDEX(N'Grupo alterado de',    a.texto),
+                    p3 = CHARINDEX(N'Grupo transferido de', a.texto),
+                    p4 = CHARINDEX(N'Group from',           a.texto),
+                    p5 = CHARINDEX(N'Group changed from',   a.texto)) AS pos
+CROSS APPLY (SELECT posicao = CASE
+        WHEN pos.p1 > 0 THEN pos.p1 + LEN(N'Grupo de')
+        WHEN pos.p2 > 0 THEN pos.p2 + LEN(N'Grupo alterado de')
+        WHEN pos.p3 > 0 THEN pos.p3 + LEN(N'Grupo transferido de')
+        WHEN pos.p4 > 0 THEN pos.p4 + LEN(N'Group from')
+        WHEN pos.p5 > 0 THEN pos.p5 + LEN(N'Group changed from')
+        ELSE 0 END) AS anc
+CROSS APPLY (SELECT resto = CONVERT(nvarchar(400),
+                 SUBSTRING(a.texto, CASE WHEN anc.posicao > 0 THEN anc.posicao ELSE 1 END, 400))) AS g
+CROSS APPLY (SELECT q1 = CHARINDEX(N'''', g.resto)) AS c1
+CROSS APPLY (SELECT q2 = CASE WHEN c1.q1 > 0 THEN CHARINDEX(N'''', g.resto, c1.q1 + 1) ELSE 0 END) AS c2
+CROSS APPLY (SELECT sp = CASE
+        WHEN c2.q2 > 0 AND CHARINDEX(N' para ', g.resto, c2.q2) > 0 THEN CHARINDEX(N' para ', g.resto, c2.q2)
+        WHEN c2.q2 > 0 THEN CHARINDEX(N' to ', g.resto, c2.q2)
+        ELSE 0 END) AS sep
+CROSS APPLY (SELECT q3 = CASE WHEN sep.sp > 0 THEN CHARINDEX(N'''', g.resto, sep.sp) ELSE 0 END) AS c3
+CROSS APPLY (SELECT q4 = CASE WHEN c3.q3 > 0 THEN CHARINDEX(N'''', g.resto, c3.q3 + 1) ELSE 0 END) AS c4
+CROSS APPLY (SELECT nome = CASE WHEN c4.q4 > c3.q3
+                                THEN SUBSTRING(g.resto, c3.q3 + 1, c4.q4 - c3.q3 - 1) ELSE N'' END) AS des
+CROSS APPLY (SELECT destino_norm = CONVERT(nvarchar(200), LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+        UPPER(LTRIM(RTRIM(des.nome))), N' ', N'<>'), N'><', N''), N'<>', N' '))))) AS d
+WHERE r.[type] IN ('I', 'R')
+  AND anc.posicao > 0 AND c3.q3 > 0 AND c4.q4 > c3.q3
+  AND EXISTS (SELECT 1 FROM #AliasCOI AS x
+              WHERE x.nome_norm COLLATE Latin1_General_CI_AI
+                  = d.destino_norm COLLATE Latin1_General_CI_AI);
+
+CREATE UNIQUE CLUSTERED INDEX IX_CandB ON #CandB(id);
+
+-- [R2] CANDIDATOS = A UNIAO B. Uma linha por SDM, sem recorte de idade.
+IF OBJECT_ID('tempdb..#RegCand') IS NOT NULL DROP TABLE #RegCand;
+
+SELECT
+    r.id, r.persid, r.ref_num, r.[type] AS tipo, r.group_id, r.open_date,
+    -- log_agent viaja junto SO PARA AUDITORIA: e a coluna de "quem abriu o
+    -- chamado". Ela NAO aparece em nenhum predicado nem na classificacao, e NAO
+    -- e o ator que transferiu o chamado para o COI.
+    r.log_agent,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, r.open_date, @Epoch)) AS abertura_br
+INTO #RegCand
+FROM dbo.call_req AS r
+WHERE EXISTS (SELECT 1 FROM #CandA AS a WHERE a.id = r.id)
+   OR EXISTS (SELECT 1 FROM #CandB AS b WHERE b.id = r.id)
+OPTION (RECOMPILE);
+
+CREATE UNIQUE CLUSTERED INDEX IX_RegCand_id ON #RegCand(id);
+CREATE INDEX IX_RegCand_persid ON #RegCand(persid);
+
+-- [R3] VIDA INTEIRA dos candidatos em dbo.act_log. Traz 'TR' (movimentacao) e
+--      'INIT' (criacao). O INIT hoje e auxiliar, mas continua sendo lido no
+--      mesmo passe - separar as leituras custaria um segundo passe sobre a
+--      tabela para produzir uma coluna de auditoria.
+--
+--      Esta e a SEGUNDA leitura de act_log do bloco, e ela e necessaria. A
+--      primeira ([R2b]) foi por FAIXA DE TEMPO e serviu so para descobrir QUEM
+--      sao os candidatos; esta e por call_req_id e traz a VIDA INTEIRA deles.
+--
+--      call_req_id fica CRU no ON - sem funcao, CAST ou COLLATE - preservando o
+--      seek em act_log_x0. Qualquer coercao ali inutiliza o indice sobre uma
+--      tabela de ~21 GB.
+IF OBJECT_ID('tempdb..#RegAtos') IS NOT NULL DROP TABLE #RegAtos;
+
+SELECT
+    c.id, al.system_time,
+    CONVERT(varchar(30), al.[type]) COLLATE DATABASE_DEFAULT AS tipo_ato,
+    (CONVERT(nvarchar(max), ISNULL(al.description, N'')) + N' ' +
+     CONVERT(nvarchar(max), ISNULL(al.action_desc,  N'')))
+        COLLATE Latin1_General_CI_AI AS texto
+INTO #RegAtos
+FROM #RegCand AS c
+JOIN dbo.act_log AS al
+    ON al.call_req_id = c.persid
+   AND al.[type] IN ('TR', 'INIT')
+   AND al.system_time IS NOT NULL
+OPTION (RECOMPILE);
+
+CREATE CLUSTERED INDEX IX_RegAtos ON #RegAtos(id, system_time);
+
+-- [R4] AUXILIAR - %GROUP= do INIT.
+--      Continua sendo extraido, mas nao decide mais DataRegistroCOI. Serve as
+--      colunas GrupoInit e InitConsistenteComReconstrucao, que existem para
+--      medir quanto o rotulo da abertura concorda com a cadeia reconstruida.
+--
+--      O valor comeca logo depois do '=' e termina no proximo '%'; sem outro
+--      '%', vai ate o fim do texto. A busca e pelo literal '%GROUP=', entao
+--      '%CATEGORY=COI...' nunca e lido como grupo e '%SUBGROUP=' tambem nao
+--      casa. DATALENGTH/2 em vez de LEN porque LEN descarta espacos a direita e
+--      erraria o comprimento no caso sem '%' final.
+IF OBJECT_ID('tempdb..#RegInitTag') IS NOT NULL DROP TABLE #RegInitTag;
+
+SELECT
+    a.id, a.system_time,
+    CONVERT(nvarchar(200), LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+        UPPER(REPLACE(REPLACE(REPLACE(v.bruto, CHAR(13), N' '), CHAR(10), N' '), CHAR(9), N' ')),
+        N' ', N'<>'), N'><', N''), N'<>', N' '))))
+        COLLATE DATABASE_DEFAULT AS grupo_init
+INTO #RegInitTag
+FROM #RegAtos AS a
+CROSS APPLY (SELECT p = CHARINDEX(N'%GROUP=', a.texto)) AS t
+CROSS APPLY (SELECT ini = t.p + 7) AS s
+CROSS APPLY (SELECT fim = CASE WHEN t.p > 0 THEN CHARINDEX(N'%', a.texto, s.ini) ELSE 0 END) AS e
+CROSS APPLY (SELECT tam = CASE WHEN t.p = 0 THEN 0
+                               WHEN e.fim > s.ini THEN e.fim - s.ini
+                               ELSE (DATALENGTH(a.texto) / 2) - s.ini + 1 END) AS n
+CROSS APPLY (SELECT bruto = CASE WHEN n.tam > 0
+                                 THEN LTRIM(RTRIM(SUBSTRING(a.texto, s.ini, n.tam)))
+                                 ELSE N'' END) AS v
+WHERE a.tipo_ato = 'INIT'
+  AND t.p > 0 AND n.tam > 0 AND LEN(LTRIM(RTRIM(v.bruto))) > 0;
+
+CREATE CLUSTERED INDEX IX_RegInitTag ON #RegInitTag(id, system_time);
+
+-- [R5] Ancora de GRUPO nos eventos 'TR'. Troca de grupo e troca de responsavel
+--      gravam o MESMO tipo 'TR': sem a ancora, "Transferir Responsavel de 'A'
+--      para 'B'" entraria como se fosse movimentacao de fila. Nenhuma das cinco
+--      ancoras abaixo casa com esse texto, e e por isso que sao literais e nao
+--      um padrao generico.
+--
+--      #RegRaw guarda TODA linha com ancora, inclusive as que o par de aspas
+--      nao conseguir ler. Essa contagem e o que separa "nao houve mudanca de
+--      grupo" de "houve mudanca que nao sabemos ler" - distincao que decide se
+--      o fallback de estado pode ou nao ser aplicado.
+IF OBJECT_ID('tempdb..#RegRaw') IS NOT NULL DROP TABLE #RegRaw;
+
+SELECT
+    a.id, a.system_time,
+    CONVERT(nvarchar(400), SUBSTRING(a.texto, anc.posicao, 400))
+        COLLATE DATABASE_DEFAULT AS resto
+INTO #RegRaw
+FROM #RegAtos AS a
+CROSS APPLY (SELECT p1 = CHARINDEX(N'Grupo de',             a.texto),
+                    p2 = CHARINDEX(N'Grupo alterado de',    a.texto),
+                    p3 = CHARINDEX(N'Grupo transferido de', a.texto),
+                    p4 = CHARINDEX(N'Group from',           a.texto),
+                    p5 = CHARINDEX(N'Group changed from',   a.texto)) AS pos
+CROSS APPLY (SELECT posicao = CASE
+        WHEN pos.p1 > 0 THEN pos.p1 + LEN(N'Grupo de')
+        WHEN pos.p2 > 0 THEN pos.p2 + LEN(N'Grupo alterado de')
+        WHEN pos.p3 > 0 THEN pos.p3 + LEN(N'Grupo transferido de')
+        WHEN pos.p4 > 0 THEN pos.p4 + LEN(N'Group from')
+        WHEN pos.p5 > 0 THEN pos.p5 + LEN(N'Group changed from')
+        ELSE 0 END) AS anc
+WHERE a.tipo_ato = 'TR'
+  AND anc.posicao > 0;
+
+CREATE CLUSTERED INDEX IX_RegRaw ON #RegRaw(id, system_time);
+
+-- [R6] Origem e destino pelo par de aspas, com o nome normalizado ao lado.
+--      Normalizacao LEVE de proposito: UPPER, trim e espacos colapsados, com a
+--      PONTUACAO preservada. '10-COI' e 'CONTRATO 7/2023 - COI' se distinguem
+--      justamente por ela. O acento e resolvido na comparacao, por collation.
+--
+--      ATENCAO: origem VAZIA nao e descartada aqui, e isso e deliberado. O
+--      evento "Grupo de '' para 'COI'" prova a ENTRADA mesmo sem provar de onde
+--      o chamado veio. Descartar a linha faria o SDM parecer sem cadeia e o
+--      empurraria para o fallback - conclusao mais forte que a evidencia.
+IF OBJECT_ID('tempdb..#RegEv') IS NOT NULL DROP TABLE #RegEv;
+
+SELECT
+    g.id, g.system_time AS evento,
+    CONVERT(nvarchar(200), LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+        UPPER(LTRIM(RTRIM(ori.nome))), N' ', N'<>'), N'><', N''), N'<>', N' '))))
+        COLLATE DATABASE_DEFAULT AS origem_norm,
+    CONVERT(nvarchar(200), LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+        UPPER(LTRIM(RTRIM(des.nome))), N' ', N'<>'), N'><', N''), N'<>', N' '))))
+        COLLATE DATABASE_DEFAULT AS destino_norm
+INTO #RegEv
+FROM #RegRaw AS g
+CROSS APPLY (SELECT q1 = CHARINDEX(N'''', g.resto)) AS c1
+CROSS APPLY (SELECT q2 = CASE WHEN c1.q1 > 0 THEN CHARINDEX(N'''', g.resto, c1.q1 + 1) ELSE 0 END) AS c2
+CROSS APPLY (SELECT nome = CASE WHEN c2.q2 > c1.q1
+                                THEN SUBSTRING(g.resto, c1.q1 + 1, c2.q2 - c1.q1 - 1) ELSE N'' END) AS ori
+CROSS APPLY (SELECT posicao = CASE
+        WHEN c2.q2 > 0 AND CHARINDEX(N' para ', g.resto, c2.q2) > 0 THEN CHARINDEX(N' para ', g.resto, c2.q2)
+        WHEN c2.q2 > 0 THEN CHARINDEX(N' to ', g.resto, c2.q2)
+        ELSE 0 END) AS sep
+CROSS APPLY (SELECT q3 = CASE WHEN sep.posicao > 0 THEN CHARINDEX(N'''', g.resto, sep.posicao) ELSE 0 END) AS c3
+CROSS APPLY (SELECT q4 = CASE WHEN c3.q3 > 0 THEN CHARINDEX(N'''', g.resto, c3.q3 + 1) ELSE 0 END) AS c4
+CROSS APPLY (SELECT nome = CASE WHEN c4.q4 > c3.q3
+                                THEN SUBSTRING(g.resto, c3.q3 + 1, c4.q4 - c3.q3 - 1) ELSE N'' END) AS des
+WHERE c1.q1 > 0 AND c2.q2 > c1.q1 AND sep.posicao > 0 AND c3.q3 > 0 AND c4.q4 > c3.q3;
+
+CREATE CLUSTERED INDEX IX_RegEv ON #RegEv(id, evento);
+
+-- [R7] UMA linha por SDM com a DataRegistroCOI e a evidencia.
+--
+--      Todos os APPLY sao TOP (1) ou agregacao escalar: nao ha caminho por onde
+--      um SDM se multiplique, e nao ha DISTINCT no final escondendo join que
+--      multiplicou. A deduplicacao acontece na modelagem, nao no fim.
+--
+--      A janela ainda NAO foi aplicada aqui. Isso e proposital: a primeira
+--      entrada tem de ser apurada sobre a vida inteira antes de qualquer
+--      recorte, senao "primeira entrada" viraria "primeira entrada da janela".
+IF OBJECT_ID('tempdb..#RegBase') IS NOT NULL DROP TABLE #RegBase;
+
+SELECT
+    c.id, c.ref_num AS SDM, c.tipo, c.open_date, c.abertura_br,
+    c.log_agent, c.group_id AS grupo_atual,
+    CONVERT(nvarchar(200), ISNULL(gn.nome, N'')) COLLATE DATABASE_DEFAULT AS grupo_atual_nome,
+    CONVERT(nvarchar(200), ISNULL(ig.grupo_init, N'')) COLLATE DATABASE_DEFAULT AS grupo_init,
+    CONVERT(nvarchar(200), ISNULL(pri.origem_norm,  N'')) COLLATE DATABASE_DEFAULT AS grupo_hist_inicial,
+    CONVERT(nvarchar(200), ISNULL(pri.destino_norm, N'')) COLLATE DATABASE_DEFAULT AS grupo_hist_destino,
+    pri.evento   AS primeiro_evento_grupo,
+    ev.n         AS qtd_evento_grupo,
+    anc.n        AS qtd_ancora_grupo,
+    -- ancoras ilegiveis antes do 1o evento legivel. Hoje TRAVA apenas o ramo
+    -- historico; nos demais viaja como auditoria, para que o efeito de
+    -- estende-la a eles seja MEDIDO antes de ser decidido.
+    ilg.n        AS qtd_ancora_antes_do_1o,
+    ent.entrada  AS primeiro_destino_coi,
+    CONVERT(varchar(46), k.evidencia) COLLATE DATABASE_DEFAULT AS evidencia_coi,
+    CONVERT(nvarchar(200), k.alias_evid) COLLATE DATABASE_DEFAULT AS alias_evidencia,
+    k.data_registro,
+    ic.init_consistente
+INTO #RegBase
+FROM #RegCand AS c
+-- nome do grupo ATUAL: coluna de auditoria. Nao entra em nenhuma decisao de
+-- evidencia - quem decide o fallback e o UUID, nao o nome de hoje.
+OUTER APPLY (SELECT TOP (1) nome = LTRIM(RTRIM(CONCAT(ISNULL(g2.first_name, N''), N' ',
+                                                      ISNULL(g2.last_name,  N''))))
+             FROM dbo.ca_contact AS g2
+             WHERE g2.contact_uuid = c.group_id) AS gn
+-- %GROUP= do INIT: AUXILIAR. O primeiro, se houver mais de um evento INIT.
+OUTER APPLY (SELECT TOP (1) t.grupo_init
+             FROM #RegInitTag AS t
+             WHERE t.id = c.id
+             ORDER BY t.system_time, t.grupo_init) AS ig
+-- PRIMEIRO evento real de grupo da vida. Origem vazia NAO e filtrada: e o caso
+-- em que a entrada se prova pelo destino.
+OUTER APPLY (SELECT TOP (1) e.evento, e.origem_norm, e.destino_norm
+             FROM #RegEv AS e
+             WHERE e.id = c.id
+             ORDER BY e.evento, e.origem_norm, e.destino_norm) AS pri
+OUTER APPLY (SELECT n = COUNT(*) FROM #RegEv  AS e WHERE e.id = c.id) AS ev
+OUTER APPLY (SELECT n = COUNT(*) FROM #RegRaw AS w WHERE w.id = c.id) AS anc
+-- ancoras de grupo ANTERIORES ao primeiro evento legivel. Como 'pri' e o mais
+-- antigo evento LEGIVEL, toda ancora estritamente anterior a ele e, por
+-- definicao, ilegivel - nao precisa de anti-join para descobrir isso.
+-- Sem evento legivel algum, conta todas, e o numero coincide com anc.n.
+OUTER APPLY (SELECT n = COUNT(*) FROM #RegRaw AS w2
+             WHERE w2.id = c.id
+               AND w2.system_time < ISNULL(pri.evento, 2147483647)) AS ilg
+-- PRIMEIRA entrada da VIDA no universo logico COI, pelo destino. Sem recorte de
+-- janela: e isto que faz a reentrada nao contar duas vezes.
+OUTER APPLY (SELECT entrada = MIN(e.evento)
+             FROM #RegEv AS e
+             WHERE e.id = c.id
+               AND EXISTS (SELECT 1 FROM #AliasCOI AS a
+                           WHERE a.nome_norm COLLATE Latin1_General_CI_AI
+                               = e.destino_norm COLLATE Latin1_General_CI_AI)) AS ent
+CROSS APPLY (SELECT
+        pri_origem_coi = CASE WHEN EXISTS (
+            SELECT 1 FROM #AliasCOI AS a
+            WHERE a.nome_norm COLLATE Latin1_General_CI_AI
+                = pri.origem_norm COLLATE Latin1_General_CI_AI) THEN 1 ELSE 0 END,
+        pri_origem_legivel = CASE WHEN NULLIF(pri.origem_norm, N'') IS NOT NULL
+                                  THEN 1 ELSE 0 END,
+        -- origem = nome POSTERIOR da fila que antes da transicao era o COI
+        pri_origem_contrato = CASE WHEN pri.origem_norm COLLATE Latin1_General_CI_AI
+                                        = N'CONTRATO 7/2023 - COI' THEN 1 ELSE 0 END,
+        atual_novo   = CASE WHEN c.group_id = @COI_UUID_Novo   THEN 1 ELSE 0 END,
+        atual_antigo = CASE WHEN c.group_id = @COI_UUID_Antigo THEN 1 ELSE 0 END,
+        antes_transicao = CASE WHEN c.open_date <= @TransIniEpoch THEN 1 ELSE 0 END,
+        na_janela_transicao = CASE WHEN c.open_date >  @TransIniEpoch
+                                    AND c.open_date <= @TransFimEpoch
+                                   THEN 1 ELSE 0 END,
+        -- o %GROUP= do INIT. Calculado AQUI, antes da hierarquia, porque agora
+        -- ele participa como TRAVA - nao como decisor de data.
+        init_eh_coi = CASE WHEN EXISTS (
+            SELECT 1 FROM #AliasInit AS a
+            WHERE a.nome_norm COLLATE Latin1_General_CI_AI
+                = ig.grupo_init COLLATE Latin1_General_CI_AI) THEN 1 ELSE 0 END,
+        -- INIT existe, e legivel (#RegInitTag so guarda valor nao vazio) e
+        -- nomeia fila que nao pertence ao universo COI
+        init_contradiz = CASE
+            WHEN ig.grupo_init IS NULL THEN 0
+            WHEN EXISTS (SELECT 1 FROM #AliasInit AS a
+                         WHERE a.nome_norm COLLATE Latin1_General_CI_AI
+                             = ig.grupo_init COLLATE Latin1_General_CI_AI) THEN 0
+            ELSE 1 END,
+        -- o INIT traz o nome que a fila so recebeu NA transicao. Num chamado
+        -- aberto antes dela, isso e anomalia - nao compatibilidade.
+        init_contrato = CASE WHEN ig.grupo_init COLLATE Latin1_General_CI_AI
+                                  = N'CONTRATO 7/2023 - COI' THEN 1 ELSE 0 END) AS f
+-- A hierarquia. A cadeia real e consultada PRIMEIRO e vence sempre; o fallback
+-- de estado so e alcancado quando nao existe NENHUM evento de grupo.
+CROSS APPLY (SELECT
+        evidencia = CASE
+            WHEN ev.n > 0 AND f.pri_origem_coi = 1
+                 THEN 'ABERTO_NO_COI_CADEIA'
+            -- TRAVA 1a: INIT anterior a transicao nao pode trazer o nome que a
+            -- fila so recebeu depois. Vem ANTES da 1b porque #AliasInit aceita
+            -- esse nome e, sozinha, deixaria o caso anomalo passar.
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contrato = 1
+                 THEN 'INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA'
+            -- TRAVA 1b: o registro de abertura nomeia fila nao-COI. A origem
+            -- historica nao pode sobrepor evidencia contemporanea da abertura.
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contradiz = 1
+                 THEN 'CONTRADICAO_INIT_x_CADEIA'
+            -- TRAVA 2: ha ancora ilegivel antes do 1o evento legivel, entao ele
+            -- pode nao ser o primeiro da vida e sua origem nao descreve a abertura
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND ilg.n > 0
+                 THEN 'SEM_RECONSTRUCAO_EVENTO_ILEGIVEL'
+            -- origem e o rotulo posterior da fila antiga: ja era COI na abertura
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                 THEN 'JA_ESTAVA_NO_COI_HISTORICO'
+            -- origem 'CONTRATO' dentro da janela: o nome nao prova de onde o
+            -- chamado veio, mas se ha evento com destino em fila COI a entrada
+            -- esta provada e datada. A ambiguidade impede antecipar para
+            -- open_date, nao apaga a entrada.
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                         AND ent.entrada IS NOT NULL
+                 THEN 'ENTRADA_DEMONSTRAVEL_DESTINO'
+            -- sem entrada demonstravel: ai sim nao se sabe SE entrou
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                 THEN 'AMBIGUO_JANELA_TRANSICAO'
+            WHEN ev.n > 0 AND f.pri_origem_legivel = 1 AND ent.entrada IS NOT NULL
+                 THEN 'TRANSFERIDO_PARA_COI'
+            WHEN ev.n > 0 AND ent.entrada IS NOT NULL
+                 THEN 'ENTRADA_DEMONSTRAVEL_DESTINO'
+            WHEN ev.n > 0
+                 THEN 'NAO_ENTRA'
+            WHEN anc.n > 0
+                 THEN 'SEM_RECONSTRUCAO_EVENTO_ILEGIVEL'
+            WHEN f.atual_novo = 1
+                 THEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL'
+            WHEN f.atual_antigo = 1 AND f.antes_transicao = 1
+                 THEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO'
+            WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
+                 THEN 'AMBIGUO_JANELA_TRANSICAO'
+            ELSE 'NAO_ENTRA' END,
+        alias_evid = CASE
+            WHEN ev.n > 0 AND f.pri_origem_coi = 1       THEN pri.origem_norm
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contrato = 1         THEN ig.grupo_init
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contradiz = 1        THEN ig.grupo_init
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND ilg.n > 0                   THEN N'(ancora ilegivel antes do 1o evento)'
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                                                         THEN pri.origem_norm
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                         AND ent.entrada IS NOT NULL     THEN N'(destino COI na 1a entrada)'
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                                                         THEN pri.origem_norm
+            WHEN ev.n > 0 AND ent.entrada IS NOT NULL    THEN N'(destino COI na 1a entrada)'
+            WHEN ev.n > 0                                THEN NULL
+            WHEN anc.n > 0                               THEN N'(evento de grupo ilegivel)'
+            WHEN f.atual_novo = 1                        THEN N'COI'
+            WHEN f.atual_antigo = 1 AND f.antes_transicao = 1
+                                                         THEN N'CONTRATO 7/2023 - COI'
+            WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
+                                                         THEN N'CONTRATO 7/2023 - COI'
+            ELSE NULL END,
+        data_registro = CASE
+            WHEN ev.n > 0 AND f.pri_origem_coi = 1       THEN c.open_date
+            -- as duas ressalvas recebem data so para poderem ser filtradas por
+            -- periodo em #RegRessalvas. Elas nao entram em #Registrados.
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contrato = 1         THEN c.open_date
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND f.init_contradiz = 1        THEN c.open_date
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                         AND ilg.n > 0                   THEN c.open_date
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.antes_transicao = 1
+                                                         THEN c.open_date
+            -- dentro da janela COM entrada demonstravel: data e a ENTRADA,
+            -- nunca open_date - a abertura nao e demonstravel como 1a entrada
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                         AND ent.entrada IS NOT NULL     THEN ent.entrada
+            -- ressalva de janela recebe data so para poder ser filtrada por periodo
+            WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
+                                                         THEN c.open_date
+            WHEN ev.n > 0 AND ent.entrada IS NOT NULL    THEN ent.entrada
+            WHEN ev.n > 0                                THEN NULL
+            -- as duas linhas abaixo recebem data SO para poderem ser filtradas
+            -- por periodo em #RegRessalvas. Elas nao entram em #Registrados.
+            WHEN anc.n > 0                               THEN c.open_date
+            WHEN f.atual_novo = 1                        THEN c.open_date
+            WHEN f.atual_antigo = 1 AND f.antes_transicao = 1
+                                                         THEN c.open_date
+            WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
+                                                         THEN c.open_date
+            ELSE NULL END) AS k
+-- auditoria do rotulo: o %GROUP= da abertura concorda com o que a cadeia mostra?
+-- f.init_eh_coi ja foi calculado acima, porque a hierarquia precisa dele.
+CROSS APPLY (SELECT init_consistente = CASE
+        WHEN ig.grupo_init IS NULL THEN NULL
+        WHEN f.init_eh_coi = 1 AND k.evidencia IN (
+                 'ABERTO_NO_COI_CADEIA',
+                 'JA_ESTAVA_NO_COI_HISTORICO',
+                 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL',
+                 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO') THEN CONVERT(bit, 1)
+        WHEN f.init_eh_coi = 0 AND k.evidencia NOT IN (
+                 'ABERTO_NO_COI_CADEIA',
+                 'JA_ESTAVA_NO_COI_HISTORICO',
+                 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL',
+                 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO') THEN CONVERT(bit, 1)
+        ELSE CONVERT(bit, 0) END) AS ic
+WHERE k.evidencia <> 'NAO_ENTRA';
+
+CREATE UNIQUE CLUSTERED INDEX IX_RegBase ON #RegBase(id);
+
+-- [R8] A janela e aplicada AGORA, sobre DataRegistroCOI - e nao sobre
+--      open_date. E aqui que o eixo temporal do indicador muda de fato.
+--
+--      As duas categorias de ressalva saem do indicador e vao para
+--      #RegRessalvas. Elas nao sao descartadas em silencio: a consulta de
+--      validacao as lista, para que a consequencia seja medida e nao suposta.
+IF OBJECT_ID('tempdb..#Registrados') IS NOT NULL DROP TABLE #Registrados;
+
+SELECT
+    b.id, b.SDM, b.tipo, b.abertura_br, b.log_agent,
+    b.grupo_atual, b.grupo_atual_nome,
+    b.grupo_init, b.grupo_hist_inicial, b.grupo_hist_destino,
+    b.qtd_evento_grupo, b.qtd_ancora_grupo, b.qtd_ancora_antes_do_1o,
+    b.init_consistente,
+    b.evidencia_coi, b.alias_evidencia, b.data_registro,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, b.data_registro, @Epoch)) AS registro_br,
+    CASE WHEN b.primeiro_evento_grupo IS NULL THEN NULL
+         ELSE DATEADD(HOUR, -@HorasBrasilParaUTC,
+                      DATEADD(SECOND, b.primeiro_evento_grupo, @Epoch)) END AS primeiro_evento_grupo_br,
+    CASE WHEN b.primeiro_destino_coi IS NULL THEN NULL
+         ELSE DATEADD(HOUR, -@HorasBrasilParaUTC,
+                      DATEADD(SECOND, b.primeiro_destino_coi, @Epoch)) END AS primeira_transf_coi_br,
+    CONVERT(bit, CASE WHEN b.open_date < @InicioEpoch THEN 1 ELSE 0 END) AS aberto_antes_periodo,
+    CONVERT(bit, CASE WHEN b.data_registro < b.open_date THEN 1 ELSE 0 END) AS anomalia_data
+INTO #Registrados
+FROM #RegBase AS b
+WHERE b.data_registro >= @InicioEpoch
+  AND b.data_registro <  @FimEpoch
+  AND b.evidencia_coi NOT IN ('AMBIGUO_JANELA_TRANSICAO',
+                              'SEM_RECONSTRUCAO_EVENTO_ILEGIVEL',
+                              'CONTRADICAO_INIT_x_CADEIA',
+                              'INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA');
+
+-- Indice NAO unico de proposito: se algum dia a regra passar a duplicar SDM, o
+-- erro deve aparecer numa conferencia COUNT(*) x COUNT(DISTINCT SDM), e nao
+-- como falha bruta de criacao de indice que esconde o diagnostico.
+CREATE CLUSTERED INDEX IX_Registrados ON #Registrados(id);
+
+-- [R9] RESSALVAS - candidatos do periodo que a regra NAO conta, e por que.
+--      Existe para que "ficou de fora" seja um numero conferivel, com os SDMs
+--      nominais, e nao uma nota de rodape.
+IF OBJECT_ID('tempdb..#RegRessalvas') IS NOT NULL DROP TABLE #RegRessalvas;
+
+SELECT
+    b.id, b.SDM, b.tipo, b.abertura_br, b.grupo_atual, b.grupo_atual_nome,
+    b.grupo_init, b.grupo_hist_inicial, b.grupo_hist_destino,
+    b.qtd_evento_grupo, b.qtd_ancora_grupo, b.qtd_ancora_antes_do_1o,
+    b.evidencia_coi, b.alias_evidencia,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, b.data_registro, @Epoch)) AS referencia_br
+INTO #RegRessalvas
+FROM #RegBase AS b
+WHERE b.data_registro >= @InicioEpoch
+  AND b.data_registro <  @FimEpoch
+  AND b.evidencia_coi IN ('AMBIGUO_JANELA_TRANSICAO',
+                          'SEM_RECONSTRUCAO_EVENTO_ILEGIVEL',
+                          'CONTRADICAO_INIT_x_CADEIA',
+                          'INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA');
+
+CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
+
+--------------------------------------------------------------------------------
+-- FIM REGRA CANONICA DE REGISTRADOS COI
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- [C] CALENDARIO - existe para que o grafico tenha todos os dias/meses/horas do
+--     intervalo, inclusive os de quantidade zero. Sem isso o eixo fica com
+--     buracos.
+--
+--     MesAno sai como AAAA-MM de proposito: DATENAME/FORMAT dependem do idioma
+--     da sessao e produziriam rotulo diferente conforme o servidor. AAAA-MM e
+--     estavel e ordena corretamente como texto.
+--------------------------------------------------------------------------------
+IF OBJECT_ID('tempdb..#Dias') IS NOT NULL DROP TABLE #Dias;
+
+SELECT TOP (DATEDIFF(DAY, @InicioBR, @FimBR))
+    CONVERT(date, DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, @InicioBR)) AS dia
+INTO #Dias
+FROM sys.all_objects AS a
+CROSS JOIN sys.all_objects AS b;
+
+CREATE UNIQUE CLUSTERED INDEX IX_Dias ON #Dias(dia);
+
+IF OBJECT_ID('tempdb..#Meses') IS NOT NULL DROP TABLE #Meses;
+
+SELECT DISTINCT
+    YEAR(d.dia)  AS Ano,
+    MONTH(d.dia) AS Mes,
+    CONVERT(char(7), CONCAT(YEAR(d.dia), N'-', RIGHT(CONCAT(N'0', MONTH(d.dia)), 2))) AS MesAno
+INTO #Meses
+FROM #Dias AS d;
+
+CREATE UNIQUE CLUSTERED INDEX IX_Meses ON #Meses(Ano, Mes);
+
+--------------------------------------------------------------------------------
+-- RESULTADO - Registrados pelo COI por mes: Incidentes x Solicitacoes
+--------------------------------------------------------------------------------
+SELECT
+    m.Ano,
+    m.Mes,
+    m.MesAno,
+    ISNULL(agg.Incidentes,   0) AS Incidentes,
+    ISNULL(agg.Solicitacoes, 0) AS Solicitacoes,
+    ISNULL(agg.Total,        0) AS Total
+FROM #Meses AS m
+OUTER APPLY (
+    SELECT
+        SUM(CASE WHEN r.tipo = 'I' THEN 1 ELSE 0 END) AS Incidentes,
+        SUM(CASE WHEN r.tipo = 'R' THEN 1 ELSE 0 END) AS Solicitacoes,
+        COUNT(*)                                      AS Total
+    FROM #Registrados AS r
+    WHERE YEAR(r.registro_br)  = m.Ano
+      AND MONTH(r.registro_br) = m.Mes
+) AS agg
+ORDER BY
+    m.Ano,
+    m.Mes;
