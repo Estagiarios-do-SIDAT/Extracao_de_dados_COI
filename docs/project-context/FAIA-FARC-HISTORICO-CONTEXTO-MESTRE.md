@@ -24821,3 +24821,87 @@ Os oito são os sete SQLs oficiais de Registrados em `coi/queries/` mais `coi/po
 Consequência a registrar: um chamado do Task Scheduler que nasce e morre em `NSTI BD` agora conta em **Registrados** e não conta em **Encerrados**. Os dois indicadores deixam de ser comparáveis linha a linha, e isso é correto — eles medem coisas distintas. Qualquer leitura que subtraia um do outro precisa ser revista.
 
 As perguntas que os dados não respondem e que continuam abertas para a gestão estão registradas fora deste documento; a principal é se o COI deve ser considerado dono dos agendamentos que abrem direto em fila de terceiros — pergunta que esta implementação responde **sim**, por decisão informada pela gestão, e não por inferência técnica.
+
+## 71. 2026-09-18 — o COI passa a ter repositório próprio; este histórico passa a ser exclusivo do COI
+
+### 71.1. A separação física
+
+Os três núcleos, que conviviam na pasta `Queries`, foram separados em três repositórios independentes:
+
+```text
+C:\Users\X04758606161\Documents\FAIA FARC\Extracao_de_dados_COI        <- este
+C:\Users\X04758606161\Documents\FAIA FARC\Extracao_de_dados_Decision
+C:\Users\X04758606161\Documents\FAIA FARC\Extracao_de_dados_A2B
+```
+
+Remote oficial do COI:
+
+```text
+https://github.com/Estagiarios-do-SIDAT/Extracao_de_dados_COI.git   branch main
+```
+
+A pasta `coi/` saiu de `Queries` em 2026-09-18, por volta de 08:25, e entrou aqui com as alterações da §70 ainda não commitadas. Antes do commit, conferiu-se que o `HEAD` deste repositório e o `HEAD` `9fb7176` de `Queries` tinham os 13 arquivos de `coi/` e este histórico **idênticos** (fim de linha normalizado): a mudança de pasta não sobrescreveu nenhuma versão divergente. Não houve migração manual de conteúdo.
+
+A implementação da §70 foi commitada e publicada **neste** repositório:
+
+```text
+a1e4ae7  feat(coi): inclui automacoes oficiais em registrados
+765df72  chore: remove license
+```
+
+Bloco canônico vigente, inalterado desde a §70:
+
+```text
+e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc   8/8 idênticos
+```
+
+### 71.2. O que muda daqui para frente
+
+```text
+fonte oficial do COI ............ Extracao_de_dados_COI
+Queries ......................... deixa de ser fonte operacional do COI
+histórico do COI ................ este arquivo, e somente ele
+trabalho de Decision ou A2B ..... não entra aqui
+```
+
+Trabalhos futuros do COI atualizam **somente** a documentação e este histórico do COI. Decision e A2B mantêm históricos próprios nos seus repositórios.
+
+### 71.3. O que este arquivo contém, e por que não foi reescrito
+
+As seções 1 a 69 foram escritas quando havia **um único** histórico para os três núcleos. Por isso contêm registros de FAIA e FARC da Decision e da Protect4, e mencionam caminhos de `Queries`. Elas ficam **como estão**, como legado histórico:
+
+- separá-las exigiria reescrever seções que tratam de dois núcleos ao mesmo tempo — por exemplo a §34 (Protect4 e Decision) e a §44 (Decision e COI) —, e isso alteraria o registro do que aconteceu;
+- menções a `Queries` nessas seções descrevem onde as coisas estavam **na época** e não são instruções atuais.
+
+O nome do arquivo, `FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md`, também é herança do documento compartilhado — o COI não tem FAIA nem FARC. Ele foi mantido para não quebrar referências; renomear é possível numa mudança própria.
+
+A partir desta seção, todo conteúdo novo aqui é do COI.
+
+### 71.4. Limpeza da raiz `FAIA FARC`
+
+A raiz acumulava 29 arquivos de trabalho do COI, fora de qualquer repositório. Foram **movidos**, sem exclusão, para:
+
+```text
+C:\Users\X04758606161\Documents\FAIA FARC\_arquivo-trabalho-coi\
+```
+
+```text
+26  coi-DIAG-*.sql    diagnósticos das investigações das §§57–70. Únicos: não têm
+                      equivalente no repositório, e suas conclusões estão neste
+                      histórico. Não entram no repositório porque são andaimes de
+                      investigação, não consultas oficiais.
+ 1  consulta_coi_pesquisa_satisfacao_encerrados.sql
+                      rascunho anterior da consulta oficial. A oficial contém todo
+                      o seu conteúdo; diferem só nos valores padrão de três
+                      parâmetros.
+ 1  consulta_pesquisa_satisfacao_encerrados.sql
+                      versão genérica, sem recorte do COI, que precedeu a oficial.
+```
+
+Nada foi apagado porque todos os arquivos são únicos no sentido estrito, e a regra do projeto é manter na dúvida. A pasta de arquivo pode ser excluída depois, por decisão explícita.
+
+Permaneceram na raiz, intocados: `Consulta para Auditoria.sql` (fonte original protegida), `resultado_-_30052026_a_29062026.xlsx` (artefato da Decision, fora do escopo do COI), `Queries`, `Reports`, `Documentos e Relatórios` e os três repositórios.
+
+### 71.5. Pendência registrada, sem alteração
+
+`coi/powerbi/consulta_coi_volumetria_power_bi.sql` usa janela de **seis ciclos 24-24** (`@COIPBI_InicioCicloAtual`). Na mesma data, essa lógica foi identificada na Decision como regra herdada da Protect4/A2B e removida de lá. No COI **nada foi alterado**: a consulta está validada, e decidir se o painel do COI deve ou não seguir ciclo 24-24 é decisão de negócio ainda não tomada.

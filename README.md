@@ -4,6 +4,8 @@ Repositório com consultas SQL, documentações e arquivos de validação usados
 
 O objetivo do projeto é manter, em um só lugar, as consultas usadas para identificar chamados registrados e encerrados pelo COI, a explicação das regras aplicadas e os materiais de conferência contra os relatórios recebidos.
 
+Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm repositórios próprios (`Extracao_de_dados_Decision` e `Extracao_de_dados_A2B`) e nada deles vive aqui. A antiga pasta `Queries`, onde os três núcleos conviviam, **não é mais fonte operacional** do COI — desde 2026-09-18 a fonte oficial é este repositório.
+
 ## Estrutura do repositório
 
 ```text
@@ -22,15 +24,12 @@ O objetivo do projeto é manter, em um só lugar, as consultas usadas para ident
 │   │   ├── consulta_coi_registrados_total_com_tecnicos.sql
 │   │   ├── consulta_coi_registrados_universo_bruto.sql
 │   │   └── consulta_coi_registrados_validacao.sql
-│   ├── powerbi/
-│   │   └── consulta_coi_volumetria_power_bi.sql
-│   └── docs/
-│       └── project-context/
-│           └── histórico e contexto do projeto
+│   └── powerbi/
+│       └── consulta_coi_volumetria_power_bi.sql
 │
 ├── docs/
 │   └── project-context/
-│       └── histórico e contexto do projeto
+│       └── FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
 │
 ├── support/
 │   ├── consulta_logs_chamados_listados.sql
@@ -38,7 +37,6 @@ O objetivo do projeto é manter, em um só lugar, as consultas usadas para ident
 │   ├── consulta_status_hold.sql
 │   └── consulta_tipos_chamado.sql
 │
-├── LICENSE
 ├── README.md
 └── .git/
 ```
@@ -54,6 +52,8 @@ A regra de negócio é construída a partir do histórico de fila, do tipo de ch
 ### Registrados pelo COI
 
 O bloco de consultas de registrados responde à pergunta: **quais chamados efetivamente entraram na base do COI no período**.
+
+Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As sete consultas e a do painel compartilham um **bloco canônico** idêntico, conferido por SHA256; a regra completa, a precedência e o hash vigente estão no Histórico Mestre.
 
 **Indicadores** — o que alimenta gráfico e painel:
 
@@ -106,27 +106,25 @@ Essas consultas não calculam indicadores do COI. Elas servem para investigar ch
 
 1. Abra o arquivo SQL do indicador desejado.
 2. Ajuste o período de apuração nos parâmetros de data.
-3. Mantenha `@MostrarDiagnostico = 0` para uso normal.
-4. Execute a consulta na base `mdb`.
-5. Exporte o resultado.
-6. Compare com os arquivos recebidos do fornecedor.
-7. Salve a análise na pasta de validação correspondente.
+3. Execute o arquivo **inteiro** na base `mdb`, sem selecionar trecho.
+4. Exporte o resultado.
+5. Compare com os arquivos recebidos do fornecedor.
 
-Quando houver divergência, use `@MostrarDiagnostico = 1` para retornar tabelas de conferência.
+Para conferir a regra de Registrados num período, rode `consulta_coi_registrados_validacao.sql`: todas as asserções devem voltar `SIM`.
 
 ## Parâmetros comuns
 
-As consultas normalmente possuem parâmetros como:
+Os nomes variam por família de consulta:
 
-```sql
-DECLARE @InicioBrasil datetime2(0)
-DECLARE @FimBrasil    datetime2(0)
-DECLARE @MostrarDiagnostico bit = 0
-```
+| Consultas | Início (inclusivo) | Fim (exclusivo) | Conferência |
+|---|---|---|---|
+| Registrados (`consulta_coi_registrados_*.sql`) | `@InicioBR` | `@FimBR` | — |
+| Encerrados | `@DataInicio` | `@DataFim` | `@MostrarDiagnostico` |
+| Pesquisa de satisfação dos encerrados | `@DataInicio` | `@DataFim` | `@MostrarConferencia` |
+| Painel (`consulta_coi_volumetria_power_bi.sql`) | automático | automático | — |
 
-- `@InicioBrasil` e `@FimBrasil` definem o período analisado.
-- `@MostrarDiagnostico = 0` retorna apenas o resultado final.
-- `@MostrarDiagnostico = 1` retorna informações extras para investigação.
+- Todas as datas são horário do Brasil (GMT-3) e o intervalo é **semiaberto**: `>= início` e `< fim`. Para março inteiro, use início `2026-03-01 00:00:00` e fim `2026-04-01 00:00:00` — nunca `23:59:59`.
+- `@TransIniBR` e `@TransFimBR`, dentro do bloco canônico, marcam a janela da renomeação das filas do COI em 18/03/2026. **Não são parâmetros de período** e não devem ser alterados.
 
 ## Fluxo de validação
 
@@ -146,3 +144,12 @@ As consultas de auditoria servem para confirmar a população e validar se os to
 - `docs/`: histórico, contexto e material de apoio.
 
 Ao alterar uma regra de cálculo, atualize também a documentação correspondente e valide o impacto nos indicadores e no painel.
+
+## Histórico Mestre
+
+O histórico do projeto fica em
+[`docs/project-context/FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md`](docs/project-context/FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md).
+
+- Ele é **append-only**: cada intervenção vira uma seção nova, e seções antigas não são reescritas.
+- Trabalhos do COI atualizam **somente** este histórico. Decision e A2B mantêm o seu, nos respectivos repositórios.
+- As seções anteriores à separação dos repositórios foram herdadas do documento compartilhado da época em que os três núcleos viviam em `Queries`. Elas contêm registros de Decision e Protect4 e são mantidas como **legado histórico**, sem reescrita. O nome do arquivo também é herdado dessa época.
