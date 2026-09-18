@@ -143,6 +143,7 @@ DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilPa
 --   InitConsistenteComReconstrucao), mas NAO decide mais a data.
 --
 -- HIERARQUIA DE EVIDENCIA - determinista, uma evidencia por SDM
+--   (AUTOMACAO_TASK_SCHEDULER entra como ULTIMO ramo; ver PRECEDENCIA)
 --
 --   1. CADEIA REAL DE MUDANCAS DE GRUPO - evidencia principal
 --
@@ -374,11 +375,89 @@ DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilPa
 --   ca_contact nem por LIKE '%COI%'. O UUID so aparece no fallback, que e
 --   justamente o ramo em que nao ha texto historico para ler.
 --
--- CONTAS TECNICAS NAO SAO CRITERIO
+-- CONTAS TECNICAS: ONDE ENTRAM E ONDE NAO ENTRAM
 --
 --   ServiceDesk, usr_automacoes e sesuc_auto sao compartilhadas com outros
---   nucleos. Nenhuma delas aparece nesta regra. log_agent viaja junto SO PARA
---   AUDITORIA e nao entra em nenhum predicado.
+--   nucleos. Um NOME DE CONTA, sozinho, continua nao provando pertencimento ao
+--   COI, e continua nao existindo ramo que conte um chamado so porque ele foi
+--   aberto por conta tecnica.
+--
+--   O que mudou: a modalidade Task Scheduler / SESUC, informada oficialmente
+--   pela gestao, e definida por uma TRINCA - interface CMD, %FROM_USERID=
+--   servicedesk e %GROUP= dentro de uma lista fechada de filas. A conta e
+--   apenas UM dos tres termos, e nenhum dos tres basta sozinho.
+--
+--   Para Zabbix, log_agent = usr_automacoes participa APENAS da coluna
+--   informativa TipoAutomacaoCOI. Nao decide pertencimento nem data: os
+--   chamados do Zabbix ja entram pela cadeia real, porque nascem no COI.
+--
+-- AUTOMACOES OFICIAIS - tres modalidades informadas pela gestao
+--
+--   A regra deixou de depender EXCLUSIVAMENTE de passagem pela fila COI. O
+--   motivo e factual: o Task Scheduler registra direto na fila do NSTI ou do
+--   fornecedor, e esses chamados nunca produzem evento de grupo com origem ou
+--   destino no COI. Antes, eles nao existiam para o indicador.
+--
+--   1. TASK SCHEDULER / SESUC     -> DECIDE pertencimento
+--
+--      Criterio oficial, os tres termos ao mesmo tempo:
+--          primeiro log 'Criado via interface CMD'
+--          %FROM_USERID= servicedesk
+--          %GROUP= em #GrupoTaskSched (lista oficial fechada, [R1c])
+--
+--      Evidencia propria: AUTOMACAO_TASK_SCHEDULER, com
+--      DataRegistroCOI = open_date. O rotulo NAO afirma entrada na fila COI -
+--      afirma registro por automacao oficial do COI em fila de destino. Por
+--      isso e rotulo separado, e nao reuso de ABERTO_NO_COI_*.
+--
+--   2. ZABBIX MONITOR             -> so CLASSIFICA
+--
+--      log_agent = usr_automacoes e type = 'I'. Os exemplos oficiais ja entram
+--      pela cadeia (ABERTO_NO_COI_CADEIA): o Zabbix abre no COI e o COI
+--      transfere adiante. Nada aqui cria linha nova nem altera data.
+--
+--      O campo 'Relatado por' da tela corresponde a log_agent.
+--      call_req.customer varia entre contas de infraestrutura e NAO e criterio.
+--
+--   3. ROBO COI / COPILOT STUDIO  -> so CLASSIFICA
+--
+--      Os exemplos oficiais ja entram pela cadeia ou pelo grupo atual. A
+--      assinatura usada aqui e EVIDENCIA TECNICA OBSERVADA, e nao criterio de
+--      negocio declarado pela gestao: interface CMD, DUAS ocorrencias de
+--      %FROM_USERID= e presenca de %TYPE=, quase sempre com %GROUP=COI.
+--
+--      %FROM_USERID= gravado NAO e vazio: contem a matricula do solicitante,
+--      ou uma conta tecnica. O modelo em branco mostrado pela gestao e marcador
+--      de template, nao o valor armazenado.
+--
+--      Por ser correlacao observada, ela alimenta SOMENTE a coluna informativa
+--      TipoAutomacaoCOI. Nenhum chamado entra, sai ou muda de data por causa
+--      dela.
+--
+--   TipoAutomacaoCOI explica a ORIGEM do registro. EvidenciaRegistroCOI explica
+--   POR QUE e QUANDO o chamado entrou no indicador. Sao independentes.
+--
+-- PRECEDENCIA ENTRE CADEIA, AUTOMACAO, FALLBACK E HISTORICO
+--
+--   1. cadeia real de eventos de grupo    ABERTO_NO_COI_CADEIA,
+--                                         JA_ESTAVA_NO_COI_HISTORICO,
+--                                         TRANSFERIDO_PARA_COI,
+--                                         ENTRADA_DEMONSTRAVEL_DESTINO
+--   2. travas e ressalvas de historico e da janela de transicao
+--   3. fallback de estado por grupo atual ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL,
+--                                         ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO
+--   4. automacao Task Scheduler           AUTOMACAO_TASK_SCHEDULER
+--
+--   A automacao e o ULTIMO recurso, deliberadamente. Assim nenhum chamado que
+--   ja contava por cadeia, historico ou grupo atual muda de evidencia ou de
+--   data: os ramos anteriores disparam primeiro. A automacao so alcanca quem
+--   antes terminava em NAO_ENTRA.
+--
+--   Consequencia aceita: se a cadeia esta ilegivel (ancora de grupo sem nenhum
+--   evento legivel), o chamado permanece na ressalva
+--   SEM_RECONSTRUCAO_EVENTO_ILEGIVEL mesmo sendo elegivel por automacao.
+--   Preferiu-se nao deixar a automacao apagar uma ressalva existente. Quantos
+--   casos sao, a consulta de validacao mede - nao se supoe.
 --------------------------------------------------------------------------------
 
 -- [R0] Identidade da fila COI e janela de transicao.
@@ -389,6 +468,14 @@ DECLARE @COI_UUID_Novo   varbinary(16) = 0x3C11B3A9EBCE5D498E2F7D7FF385F967;  --
 
 DECLARE @TransIniBR datetime2(0) = '2026-03-18 20:35:51';  -- ultimo evento real '10-COI'
 DECLARE @TransFimBR datetime2(0) = '2026-03-18 21:48:58';  -- 1o evento real 'CONTRATO 7/2023 - COI'
+-- Conta tecnica do Zabbix, resolvida por userid e nunca por UUID fixo. Serve
+-- exclusivamente a coluna informativa TipoAutomacaoCOI. Se a conta nao existir,
+-- fica NULL e a classificacao apenas nao marca Zabbix - nenhum chamado entra
+-- ou sai por causa disso.
+DECLARE @UUID_UsrAutomacoes varbinary(16) = (
+    SELECT TOP (1) k.contact_uuid FROM dbo.ca_contact AS k
+    WHERE k.userid COLLATE Latin1_General_CI_AI = N'usr_automacoes');
+
 DECLARE @TransIniEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @TransIniBR));
 DECLARE @TransFimEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @TransFimBR));
 
@@ -405,6 +492,43 @@ INSERT INTO #AliasCOI (nome_norm) VALUES (N'COI'), (N'10-COI');
 IF OBJECT_ID('tempdb..#AliasInit') IS NOT NULL DROP TABLE #AliasInit;
 CREATE TABLE #AliasInit (nome_norm nvarchar(200) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY);
 INSERT INTO #AliasInit (nome_norm) VALUES (N'COI'), (N'10-COI'), (N'CONTRATO 7/2023 - COI');
+
+-- [R1c] Filas oficiais do Task Scheduler / SESUC, exatamente como a gestao
+--       informou. A lista e FECHADA: %GROUP= fora dela NAO entra pela
+--       automacao, ainda que o chamado seja 'Criado via interface CMD' por
+--       servicedesk.
+--
+--       Os nomes estao SEM ACENTO de proposito. Todo o bloco e ASCII e a
+--       comparacao usa Latin1_General_CI_AI, accent-insensitive: 'NSTI
+--       SEGURANCA' casa com o nome gravado com cedilha e 'NSTI APLICACAO' casa
+--       com o gravado com til. Os valores tambem chegam em caixa alta, porque
+--       #RegInitTag ja aplica UPPER.
+--
+--       '10-COI' e o nome historico do COI e NAO esta na lista oficial. Isso e
+--       proposital: chamados assim entram - quando entram - pela cadeia real,
+--       e nao pela automacao.
+IF OBJECT_ID('tempdb..#GrupoTaskSched') IS NOT NULL DROP TABLE #GrupoTaskSched;
+CREATE TABLE #GrupoTaskSched (nome_norm nvarchar(200) COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY);
+INSERT INTO #GrupoTaskSched (nome_norm) VALUES
+    (N'FORNECEDORES - A2B'),
+    (N'FORNECEDORES - AMM'),
+    (N'FORNECEDORES - BULL'),
+    (N'FORNECEDORES BULL - 41/2022 - G1 - FA1/FA2'),
+    (N'FORNECEDORES BULL - 41/2022 - G2 - FB1'),
+    (N'FORNECEDORES BULL - 45/2020 - G1 - FA3/FA4/FA5'),
+    (N'FORNECEDORES BULL - 45/2020 - G2 - FB2'),
+    (N'FORNECEDORES BULL - 45/2020 - G3 - FA-NAS-1 / FB3'),
+    (N'FORNECEDORES - DECISION'),
+    (N'NSTI REDE'),
+    (N'NSTI SEGURANCA'),
+    (N'NSTI APLICACAO'),
+    (N'NSTI AD-WORKPLACE'),
+    (N'NSTI BD'),
+    (N'NSTI BI-ANALYTICS'),
+    (N'NSTI SO'),
+    (N'NSTI GCM'),
+    (N'NSTI PLAN-DOC'),
+    (N'COI');
 
 -- [R2a] CONJUNTO A - chamados I/R abertos DENTRO da janela.
 --       open_date e type crus: sargaveis.
@@ -577,6 +701,70 @@ WHERE a.tipo_ato = 'INIT'
 
 CREATE CLUSTERED INDEX IX_RegInitTag ON #RegInitTag(id, system_time);
 
+-- [R4b] AUXILIAR - assinatura de automacao no evento INIT.
+--
+--       Le o MESMO texto de [R3] - description + action_desc concatenados, sem
+--       truncamento - e produz quatro medidas por evento INIT:
+--
+--           via_cmd      o log comeca por 'Criado via interface CMD'
+--           n_from       quantas vezes '%FROM_USERID=' aparece
+--           n_type       quantas vezes '%TYPE=' aparece
+--           from_userid  o VALOR de '%FROM_USERID=', normalizado
+--
+--       POR QUE O CORTE E DIFERENTE DO DE [R4]
+--
+--       [R4] corta o valor no proximo '%'. Isso funciona para %GROUP= porque
+--       %AFFECTED_RC= sempre vem depois dele. Nao funciona para
+--       %FROM_USERID=, que costuma ser a ULTIMA tag do INIT: sem um '%'
+--       seguinte, o valor absorveria todo o texto restante e 'servicedesk'
+--       viraria 'servicedesk Criar solicitacao/incidente/...'.
+--
+--       Por isso aqui o valor termina no PRIMEIRO de { '%', CR, LF }. Quando
+--       nao ha nenhum dos tres, vai ate o fim do texto, e DATALENGTH/2 mede
+--       esse fim - LEN descartaria espacos a direita e erraria o comprimento.
+--
+--       A normalizacao final e a mesma de [R4]: CHAR(13), CHAR(10) e CHAR(9)
+--       viram espaco ANTES de qualquer comparacao, espacos repetidos colapsam
+--       e o resultado vai para caixa alta. RTRIM sozinho nao removeria a quebra
+--       de linha que o valor carrega.
+--
+--       n_from e n_type contam ocorrencias por diferenca de comprimento: o
+--       texto sem a tag e mais curto exatamente (ocorrencias x tamanho da tag).
+--       '%FROM_USERID=' tem 13 caracteres e '%TYPE=' tem 6.
+IF OBJECT_ID('tempdb..#RegAutoTag') IS NOT NULL DROP TABLE #RegAutoTag;
+
+SELECT
+    a.id, a.system_time,
+    CONVERT(bit, CASE WHEN CHARINDEX(N'Criado via interface CMD', a.texto) > 0
+                      THEN 1 ELSE 0 END) AS via_cmd,
+    CONVERT(int, ((DATALENGTH(a.texto) / 2)
+                  - (DATALENGTH(REPLACE(a.texto, N'%FROM_USERID=', N'')) / 2)) / 13) AS n_from,
+    CONVERT(int, ((DATALENGTH(a.texto) / 2)
+                  - (DATALENGTH(REPLACE(a.texto, N'%TYPE=', N'')) / 2)) / 6) AS n_type,
+    CONVERT(nvarchar(200), LTRIM(RTRIM(REPLACE(REPLACE(REPLACE(
+        UPPER(REPLACE(REPLACE(REPLACE(v.bruto, CHAR(13), N' '), CHAR(10), N' '), CHAR(9), N' ')),
+        N' ', N'<>'), N'><', N''), N'<>', N' '))))
+        COLLATE DATABASE_DEFAULT AS from_userid
+INTO #RegAutoTag
+FROM #RegAtos AS a
+CROSS APPLY (SELECT p = CHARINDEX(N'%FROM_USERID=', a.texto)) AS t
+CROSS APPLY (SELECT ini = t.p + 13) AS s
+CROSS APPLY (SELECT fim = CASE WHEN t.p = 0 THEN 0 ELSE z.menor END
+             FROM (SELECT menor = MIN(w.p)
+                   FROM (VALUES (NULLIF(CHARINDEX(N'%',     a.texto, t.p + 13), 0)),
+                                (NULLIF(CHARINDEX(CHAR(13), a.texto, t.p + 13), 0)),
+                                (NULLIF(CHARINDEX(CHAR(10), a.texto, t.p + 13), 0))
+                        ) AS w(p)) AS z) AS e
+CROSS APPLY (SELECT tam = CASE WHEN t.p = 0 THEN 0
+                               WHEN e.fim > s.ini THEN e.fim - s.ini
+                               ELSE (DATALENGTH(a.texto) / 2) - s.ini + 1 END) AS n
+CROSS APPLY (SELECT bruto = CASE WHEN n.tam > 0
+                                 THEN LTRIM(RTRIM(SUBSTRING(a.texto, s.ini, n.tam)))
+                                 ELSE N'' END) AS v
+WHERE a.tipo_ato = 'INIT';
+
+CREATE CLUSTERED INDEX IX_RegAutoTag ON #RegAutoTag(id, system_time);
+
 -- [R5] Ancora de GRUPO nos eventos 'TR'. Troca de grupo e troca de responsavel
 --      gravam o MESMO tipo 'TR': sem a ancora, "Transferir Responsavel de 'A'
 --      para 'B'" entraria como se fosse movimentacao de fila. Nenhuma das cinco
@@ -678,7 +866,8 @@ SELECT
     CONVERT(varchar(46), k.evidencia) COLLATE DATABASE_DEFAULT AS evidencia_coi,
     CONVERT(nvarchar(200), k.alias_evid) COLLATE DATABASE_DEFAULT AS alias_evidencia,
     k.data_registro,
-    ic.init_consistente
+    ic.init_consistente,
+    CONVERT(nvarchar(40), tp.tipo_automacao) COLLATE DATABASE_DEFAULT AS tipo_automacao
 INTO #RegBase
 FROM #RegCand AS c
 -- nome do grupo ATUAL: coluna de auditoria. Nao entra em nenhuma decisao de
@@ -692,6 +881,12 @@ OUTER APPLY (SELECT TOP (1) t.grupo_init
              FROM #RegInitTag AS t
              WHERE t.id = c.id
              ORDER BY t.system_time, t.grupo_init) AS ig
+-- assinatura de automacao do PRIMEIRO evento INIT. Mesmo criterio de desempate
+-- de 'ig': o INIT mais antigo. Um chamado com varios INIT usa o da criacao.
+OUTER APPLY (SELECT TOP (1) u.via_cmd, u.n_from, u.n_type, u.from_userid
+             FROM #RegAutoTag AS u
+             WHERE u.id = c.id
+             ORDER BY u.system_time, u.from_userid) AS au
 -- PRIMEIRO evento real de grupo da vida. Origem vazia NAO e filtrada: e o caso
 -- em que a entrada se prova pelo destino.
 OUTER APPLY (SELECT TOP (1) e.evento, e.origem_norm, e.destino_norm
@@ -748,7 +943,30 @@ CROSS APPLY (SELECT
         -- o INIT traz o nome que a fila so recebeu NA transicao. Num chamado
         -- aberto antes dela, isso e anomalia - nao compatibilidade.
         init_contrato = CASE WHEN ig.grupo_init COLLATE Latin1_General_CI_AI
-                                  = N'CONTRATO 7/2023 - COI' THEN 1 ELSE 0 END) AS f
+                                  = N'CONTRATO 7/2023 - COI' THEN 1 ELSE 0 END,
+        -- AUTOMACAO 1 - Task Scheduler / SESUC. UNICA que decide pertencimento.
+        -- Os tres termos oficiais precisam valer ao mesmo tempo; nenhum deles
+        -- sozinho classifica coisa alguma.
+        auto_task_sched = CASE
+            WHEN au.via_cmd = 1
+             AND au.from_userid COLLATE Latin1_General_CI_AI = N'SERVICEDESK'
+             AND EXISTS (SELECT 1 FROM #GrupoTaskSched AS gt
+                         WHERE gt.nome_norm COLLATE Latin1_General_CI_AI
+                             = ig.grupo_init COLLATE Latin1_General_CI_AI)
+            THEN 1 ELSE 0 END,
+        -- AUTOMACAO 2 - Zabbix. SO CLASSIFICA. Nao aparece em nenhum ramo da
+        -- hierarquia de evidencia nem em data_registro.
+        auto_zabbix = CASE
+            WHEN @UUID_UsrAutomacoes IS NOT NULL
+             AND c.log_agent = @UUID_UsrAutomacoes
+             AND c.tipo = 'I'
+            THEN 1 ELSE 0 END,
+        -- AUTOMACAO 3 - Robo COI / Copilot Studio. SO CLASSIFICA. Assinatura
+        -- tecnica OBSERVADA, nao criterio declarado: CMD + %FROM_USERID=
+        -- duplicado + %TYPE= presente.
+        auto_robo = CASE
+            WHEN au.via_cmd = 1 AND au.n_from = 2 AND au.n_type >= 1
+            THEN 1 ELSE 0 END) AS f
 -- A hierarquia. A cadeia real e consultada PRIMEIRO e vence sempre; o fallback
 -- de estado so e alcancado quando nao existe NENHUM evento de grupo.
 CROSS APPLY (SELECT
@@ -788,6 +1006,11 @@ CROSS APPLY (SELECT
                  THEN 'TRANSFERIDO_PARA_COI'
             WHEN ev.n > 0 AND ent.entrada IS NOT NULL
                  THEN 'ENTRADA_DEMONSTRAVEL_DESTINO'
+            -- AUTOMACAO como ULTIMO recurso do ramo com cadeia: o chamado tem
+            -- eventos de grupo, nenhum deles toca o COI, e antes disso ele
+            -- terminava em NAO_ENTRA. Nenhum ramo acima muda de resultado.
+            WHEN ev.n > 0 AND f.auto_task_sched = 1
+                 THEN 'AUTOMACAO_TASK_SCHEDULER'
             WHEN ev.n > 0
                  THEN 'NAO_ENTRA'
             WHEN anc.n > 0
@@ -798,6 +1021,11 @@ CROSS APPLY (SELECT
                  THEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO'
             WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
                  THEN 'AMBIGUO_JANELA_TRANSICAO'
+            -- AUTOMACAO como ULTIMO recurso do ramo sem cadeia: e o caso dos
+            -- chamados que nascem direto na fila do NSTI ou do fornecedor e
+            -- nunca produzem evento de grupo.
+            WHEN f.auto_task_sched = 1
+                 THEN 'AUTOMACAO_TASK_SCHEDULER'
             ELSE 'NAO_ENTRA' END,
         alias_evid = CASE
             WHEN ev.n > 0 AND f.pri_origem_coi = 1       THEN pri.origem_norm
@@ -814,6 +1042,7 @@ CROSS APPLY (SELECT
             WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
                                                          THEN pri.origem_norm
             WHEN ev.n > 0 AND ent.entrada IS NOT NULL    THEN N'(destino COI na 1a entrada)'
+            WHEN ev.n > 0 AND f.auto_task_sched = 1      THEN ig.grupo_init
             WHEN ev.n > 0                                THEN NULL
             WHEN anc.n > 0                               THEN N'(evento de grupo ilegivel)'
             WHEN f.atual_novo = 1                        THEN N'COI'
@@ -821,6 +1050,9 @@ CROSS APPLY (SELECT
                                                          THEN N'CONTRATO 7/2023 - COI'
             WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
                                                          THEN N'CONTRATO 7/2023 - COI'
+            -- a fila em que a automacao registrou. NAO e alias do COI: e o
+            -- destino oficial do agendamento, e a coluna diz exatamente isso.
+            WHEN f.auto_task_sched = 1                   THEN ig.grupo_init
             ELSE NULL END,
         data_registro = CASE
             WHEN ev.n > 0 AND f.pri_origem_coi = 1       THEN c.open_date
@@ -842,6 +1074,7 @@ CROSS APPLY (SELECT
             WHEN ev.n > 0 AND f.pri_origem_contrato = 1 AND f.na_janela_transicao = 1
                                                          THEN c.open_date
             WHEN ev.n > 0 AND ent.entrada IS NOT NULL    THEN ent.entrada
+            WHEN ev.n > 0 AND f.auto_task_sched = 1      THEN c.open_date
             WHEN ev.n > 0                                THEN NULL
             -- as duas linhas abaixo recebem data SO para poderem ser filtradas
             -- por periodo em #RegRessalvas. Elas nao entram em #Registrados.
@@ -851,11 +1084,19 @@ CROSS APPLY (SELECT
                                                          THEN c.open_date
             WHEN f.atual_antigo = 1 AND f.na_janela_transicao = 1
                                                          THEN c.open_date
+            -- pertencimento exclusivamente por automacao: a data e a ABERTURA.
+            -- Nao ha entrada em fila COI para datar, e inventar uma seria pior
+            -- do que usar o unico instante demonstravel do registro.
+            WHEN f.auto_task_sched = 1                   THEN c.open_date
             ELSE NULL END) AS k
 -- auditoria do rotulo: o %GROUP= da abertura concorda com o que a cadeia mostra?
 -- f.init_eh_coi ja foi calculado acima, porque a hierarquia precisa dele.
 CROSS APPLY (SELECT init_consistente = CASE
         WHEN ig.grupo_init IS NULL THEN NULL
+        -- por construcao alias_evidencia = grupo_init neste ramo: o rotulo da
+        -- abertura e exatamente a fila que a regra afirma. Nao ha o que
+        -- contradizer, com %GROUP=COI ou com qualquer outra fila da lista.
+        WHEN k.evidencia = 'AUTOMACAO_TASK_SCHEDULER' THEN CONVERT(bit, 1)
         WHEN f.init_eh_coi = 1 AND k.evidencia IN (
                  'ABERTO_NO_COI_CADEIA',
                  'JA_ESTAVA_NO_COI_HISTORICO',
@@ -867,6 +1108,27 @@ CROSS APPLY (SELECT init_consistente = CASE
                  'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL',
                  'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO') THEN CONVERT(bit, 1)
         ELSE CONVERT(bit, 0) END) AS ic
+-- MODALIDADE DE AUTOMACAO - coluna INFORMATIVA.
+--
+--   Nao participa de nenhuma decisao de pertencimento nem de data. Serve para
+--   explicar a ORIGEM do registro ao lado de evidencia_coi, que explica por que
+--   e quando o chamado entrou.
+--
+--   As tres assinaturas sao disjuntas nos dados observados - servicedesk contra
+--   matricula, %FROM_USERID= unico contra duplicado, CMD contra ausencia de
+--   CMD. A ordem do CASE existe so para tornar o resultado determinista caso
+--   alguma delas passe a se sobrepor no futuro; a consulta de validacao mede se
+--   isso aconteceu, em vez de confiar na ordem.
+--
+--   'Criado via interface CMD' por servicedesk com %GROUP= FORA da lista
+--   oficial fica deliberadamente NAO classificado. A modalidade oficial e a
+--   trinca inteira, e a validacao conta esses casos para que a lacuna seja
+--   visivel e nao silenciosa.
+CROSS APPLY (SELECT tipo_automacao = CASE
+        WHEN f.auto_task_sched = 1 THEN N'Task Scheduler / SESUC'
+        WHEN f.auto_zabbix     = 1 THEN N'Zabbix Monitor'
+        WHEN f.auto_robo       = 1 THEN N'Robo COI'
+        ELSE NULL END) AS tp
 WHERE k.evidencia <> 'NAO_ENTRA';
 
 CREATE UNIQUE CLUSTERED INDEX IX_RegBase ON #RegBase(id);
@@ -884,7 +1146,7 @@ SELECT
     b.grupo_atual, b.grupo_atual_nome,
     b.grupo_init, b.grupo_hist_inicial, b.grupo_hist_destino,
     b.qtd_evento_grupo, b.qtd_ancora_grupo, b.qtd_ancora_antes_do_1o,
-    b.init_consistente,
+    b.init_consistente, b.tipo_automacao,
     b.evidencia_coi, b.alias_evidencia, b.data_registro,
     DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, b.data_registro, @Epoch)) AS registro_br,
     CASE WHEN b.primeiro_evento_grupo IS NULL THEN NULL
@@ -918,7 +1180,7 @@ SELECT
     b.id, b.SDM, b.tipo, b.abertura_br, b.grupo_atual, b.grupo_atual_nome,
     b.grupo_init, b.grupo_hist_inicial, b.grupo_hist_destino,
     b.qtd_evento_grupo, b.qtd_ancora_grupo, b.qtd_ancora_antes_do_1o,
-    b.evidencia_coi, b.alias_evidencia,
+    b.evidencia_coi, b.alias_evidencia, b.tipo_automacao,
     DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, b.data_registro, @Epoch)) AS referencia_br
 INTO #RegRessalvas
 FROM #RegBase AS b
@@ -950,6 +1212,13 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 --
 --   FormaRegistroCOI      texto de negocio, para ler e filtrar no Excel/Power BI
 --   EvidenciaRegistroCOI  o rotulo tecnico da hierarquia, sem traducao
+--   TipoAutomacaoCOI      a MODALIDADE de automacao que originou o registro
+--
+--   As duas primeiras respondem POR QUE e QUANDO o chamado entrou no indicador.
+--   TipoAutomacaoCOI responde outra coisa: DE ONDE ele veio. Um chamado do
+--   Zabbix entra por ABERTO_NO_COI_CADEIA e um do Robo COI tambem - a evidencia
+--   nao os distingue, e a modalidade sim. Por isso sao colunas separadas e nao
+--   uma so.
 --
 --   O nome EvidenciaRegistroCOI e PRESERVADO de proposito. Renomea-lo para algo
 --   mais curto quebraria consumidores que leem a saida por nome de coluna -
@@ -995,9 +1264,14 @@ SELECT
              THEN N'Aberto no COI - inferido'
         WHEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO'
              THEN N'Aberto no COI - inferido'
+        WHEN 'AUTOMACAO_TASK_SCHEDULER'
+             THEN N'Registrado por automação do COI'
         ELSE N'Outro - ' + CONVERT(nvarchar(46), r.evidencia_coi)
         END)                                        AS FormaRegistroCOI,
     r.evidencia_coi                                 AS EvidenciaRegistroCOI,
+    -- ORIGEM do registro, independente de FormaRegistroCOI/EvidenciaRegistroCOI.
+    -- NULL = nenhuma das tres modalidades oficiais reconhecida.
+    ISNULL(r.tipo_automacao, N'Não automatizado')   AS TipoAutomacaoCOI,
 
     -- ROTULO DA ABERTURA E CADEIA, lado a lado com as duas acima
     ISNULL(NULLIF(r.grupo_init, N''), N'(sem %GROUP= no INIT)')         AS GrupoInit,

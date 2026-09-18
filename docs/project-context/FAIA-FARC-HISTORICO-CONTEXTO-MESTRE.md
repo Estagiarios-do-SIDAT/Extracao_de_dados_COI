@@ -24576,3 +24576,248 @@ A investigação das automações (§68) permanece válida e não foi reaberta: 
 `coi/queries/consulta_coi_encerrados.sql` não foi tocada.
 
 --- FIM DO ARQUIVO MESTRE ---
+
+## 70. 2026-09-17 — automações oficiais entram em Registrados COI: o indicador deixa de depender exclusivamente de passagem pela fila
+
+**Esta seção SUPERSEDE, para o estado atual da regra, dois pontos das seções anteriores**: a conclusão da §68 de que os adicionais líquidos por automação seriam iguais a zero (reafirmada em 69.8), e o SHA256 do bloco canônico registrado em 69.7. Os valores das §§67–69 permanecem corretos **como registro do que era verdade em 2026-09-16** e não foram reescritos.
+
+### 70.1. O que a gestão informou
+
+Três modalidades oficiais de registro automatizado do COI:
+
+```text
+1. Task Scheduler / SESUC
+2. Zabbix Monitor
+3. Robô COI / Copilot Studio
+```
+
+E treze SDMs como casos de referência — quatro, quatro e cinco, respectivamente. Esses SDMs **não estão codificados em nenhuma regra**: serviram para descobrir a assinatura de cada modalidade e para conferir o resultado depois.
+
+### 70.2. A mudança conceitual
+
+Até aqui, pertencer ao indicador exigia **evidência de presença na fila COI** — origem, destino ou grupo atual. O Task Scheduler quebra essa premissa: ele registra direto na fila do NSTI ou do fornecedor, e o chamado **nunca produz evento de grupo que toque o COI**. Para a regra anterior esses chamados simplesmente não existiam.
+
+```text
+antes:  pertence ao COI  <=>  esteve na fila COI
+agora:  pertence ao COI  <=>  esteve na fila COI
+                              OU  foi registrado por automação oficial do COI
+```
+
+Por que a §68 não viu isso: ela partiu do universo `%GROUP=COI`/`10-COI`. Os chamados do Task Scheduler não se declaram COI — por construção estavam fora do universo examinado. A conclusão "adicionais líquidos = 0" era verdadeira para o que foi medido, e estreita demais para o que se concluiu dela.
+
+### 70.3. Critérios das três modalidades
+
+**1. Task Scheduler / SESUC — decide pertencimento.** Os três termos ao mesmo tempo:
+
+```text
+primeiro log  'Criado via interface CMD'
+%FROM_USERID= servicedesk
+%GROUP=       dentro da lista oficial fechada  (#GrupoTaskSched, [R1c])
+```
+
+Lista oficial, 19 filas: `Fornecedores - A2B`, `Fornecedores - AMM`, `Fornecedores - Bull`, `Fornecedores Bull - 41/2022 - G1 - FA1/FA2`, `Fornecedores Bull - 41/2022 - G2 - FB1`, `Fornecedores Bull - 45/2020 - G1 - FA3/FA4/FA5`, `Fornecedores Bull - 45/2020 - G2 - FB2`, `Fornecedores Bull - 45/2020 - G3 - FA-NAS-1 / FB3`, `Fornecedores - Decision`, `NSTI REDE`, `NSTI SEGURANÇA`, `NSTI APLICAÇÃO`, `NSTI AD-WORKPLACE`, `NSTI BD`, `NSTI BI-ANALYTICS`, `NSTI SO`, `NSTI GCM`, `NSTI PLAN-DOC`, `COI`.
+
+Evidência própria `AUTOMACAO_TASK_SCHEDULER`, com `DataRegistroCOI = DataAbertura`. O rótulo **não afirma entrada na fila COI** — afirma registro por automação oficial do COI em fila de destino. Por isso é rótulo separado, e não reúso de `ABERTO_NO_COI_*`.
+
+`10-COI` é o nome histórico do COI e **não** está na lista. Deliberado: chamados assim entram, quando entram, pela cadeia real.
+
+**2. Zabbix Monitor — apenas classifica.** `log_agent = usr_automacoes` e `type = 'I'`. O UUID da conta é resolvido por `userid` em tempo de execução, nunca fixado no código. Os exemplos oficiais já entravam por `ABERTO_NO_COI_CADEIA`: o Zabbix abre no COI e o COI transfere adiante.
+
+O campo "Relatado por" da tela corresponde a `log_agent`. `call_req.customer` varia entre contas de infraestrutura (`admInfaCPD`, `ATILAPA`) e **não** é usado como critério.
+
+**3. Robô COI / Copilot Studio — apenas classifica.** Assinatura técnica **observada**, não critério declarado pela gestão: interface CMD, **duas** ocorrências de `%FROM_USERID=` e presença de `%TYPE=`, quase sempre com `%GROUP=COI`.
+
+Um achado que corrige uma suposição anterior: **`%FROM_USERID=` gravado não é vazio.** Ele contém a matrícula do solicitante, ou uma conta técnica. O modelo em branco mostrado pela gestão é marcador de template, não o valor armazenado — e foi por isso que a busca anterior por tag vazia não encontrou nada.
+
+Por ser correlação observada, essa assinatura alimenta **somente** a coluna informativa. Nenhum chamado entra, sai ou muda de data por causa dela.
+
+### 70.4. Precedência
+
+```text
+1. cadeia real de eventos de grupo    ABERTO_NO_COI_CADEIA
+                                      JA_ESTAVA_NO_COI_HISTORICO
+                                      TRANSFERIDO_PARA_COI
+                                      ENTRADA_DEMONSTRAVEL_DESTINO
+2. travas e ressalvas de histórico e da janela de transição
+3. fallback de estado por grupo atual ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL
+                                      ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO
+4. automação Task Scheduler           AUTOMACAO_TASK_SCHEDULER
+```
+
+A automação é o **último recurso, deliberadamente**. Assim nenhum chamado que já contava por cadeia, histórico ou grupo atual muda de evidência ou de data — os ramos anteriores disparam primeiro. A automação só alcança quem antes terminava em `NAO_ENTRA`. O antes/depois em 70.6 confirma isso empiricamente: zero alterações nos SDMs comuns.
+
+**Consequência aceita e medida:** se a cadeia está ilegível (âncora de grupo sem nenhum evento legível), o chamado permanece na ressalva `SEM_RECONSTRUCAO_EVENTO_ILEGIVEL` mesmo sendo elegível por automação. Preferiu-se não deixar a automação apagar uma ressalva existente. `QtdElegivelRetidoPorRessalva` mede o preço: **0** nos quatro períodos validados.
+
+### 70.5. O parser das tags
+
+`%FROM_USERID=` costuma ser a **última** tag do INIT. O corte usado em `[R4]` para `%GROUP=` — "até o próximo `%`" — funciona lá porque `%AFFECTED_RC=` sempre vem depois, e falharia aqui: sem `%` seguinte, o valor absorveria o texto restante e `servicedesk` viraria `servicedesk Criar solicitação/incidente/...`.
+
+Por isso `[R4b]` corta o valor no **primeiro de `{ '%', CR, LF }`**, e só então normaliza `CHAR(13)`, `CHAR(10)` e `CHAR(9)` para espaço. `RTRIM` sozinho não removeria a quebra de linha que o valor carrega. Sem `%`, CR ou LF, vai até o fim do texto medido por `DATALENGTH/2` — `LEN` descartaria espaços à direita e erraria o comprimento.
+
+`n_from` e `n_type` contam ocorrências por diferença de comprimento: o texto sem a tag é mais curto exatamente `(ocorrências × tamanho da tag)`.
+
+### 70.6. Antes × depois
+
+Regra antiga e regra nova executadas na **mesma janela de tempo**, out/2025 a set/2026, para que a comparação não sofresse com chamados abertos entre as duas execuções:
+
+```text
+total antes ................. 21.211
+total depois ................ 40.909
+adicionados ................. 19.698
+removidos ...................      0
+SDMs comuns ................. 21.211
+DataRegistroCOI alterada ....      0
+EvidenciaRegistroCOI muda ...      0
+FormaRegistroCOI muda .......      0
+duplicados ..................      0
+```
+
+Todos os 19.698 adicionados têm `TipoAutomacaoCOI = Task Scheduler / SESUC`, evidência `AUTOMACAO_TASK_SCHEDULER` e **tipo R**. A contagem de Incidentes não muda em nenhum mês — assinatura limpa de que a automação não tocou a população anterior.
+
+Por mês:
+
+```text
+Mes       ANTES  I     R    Tot  |  DEPOIS  I     R    Tot  |  Delta
+2025-10        506  1352   1858  |        506  3276   3782  | +1924
+2025-11        520  1016   1536  |        520  2690   3210  | +1674
+2025-12        517  1007   1524  |        517  2876   3393  | +1869
+2026-01        458   864   1322  |        458  2615   3073  | +1751
+2026-02        566  1115   1681  |        566  2738   3304  | +1623
+2026-03        918  1705   2623  |        918  3424   4342  | +1719
+2026-04        735  1262   1997  |        735  2945   3680  | +1683
+2026-05        727  1109   1836  |        727  2695   3422  | +1586
+2026-06        604  1196   1800  |        604  2879   3483  | +1683
+2026-07        461  1228   1689  |        461  2937   3398  | +1709
+2026-08        801  1293   2094  |        801  2878   3679  | +1585
+2026-09        343   908   1251  |        343  1800   2143  |  +892
+```
+
+Setembro é mês parcial. Os adicionados distribuem-se por 18 filas, todas da lista oficial:
+
+```text
+NSTI BI-ANALYTICS .......................... 9369
+NSTI REDE .................................. 1798
+NSTI BD .................................... 1760
+Fornecedores - Decision .................... 1358
+NSTI APLICAÇÃO ............................. 1178
+Fornecedores - A2B ......................... 1175
+NSTI SO ....................................  845
+NSTI PLAN-DOC ..............................  384
+Fornecedores - AMM .........................  305
+NSTI AD-WORKPLACE ..........................  269
+Fornecedores Bull - 41/2022 - G1 - FA1/FA2 .  248
+Fornecedores Bull - 41/2022 - G2 - FB1 .....  248
+Fornecedores Bull - 45/2020 - G1 ...........  198
+Fornecedores Bull - 45/2020 - G2 - FB2 .....  198
+Fornecedores Bull - 45/2020 - G3 ...........  198
+NSTI SEGURANÇA .............................  115
+NSTI GCM ...................................   29
+Fornecedores - Bull ........................   23
+```
+
+A investigação da §68-bis estimara ~20,1 mil. O número oficial, que sai da aplicação dos critérios da gestão, é **19.698**. A diferença vem de a investigação ter usado um teste aproximado de "nunca esteve no COI"; a implementação usa a hierarquia canônica inteira.
+
+### 70.7. Os treze casos oficiais
+
+Todos os treze entram, **uma única vez cada**, com a modalidade correta:
+
+```text
+1729867  Task Scheduler / SESUC  AUTOMACAO_TASK_SCHEDULER            entrou agora
+1731874  Task Scheduler / SESUC  AUTOMACAO_TASK_SCHEDULER            entrou agora
+1732307  Task Scheduler / SESUC  AUTOMACAO_TASK_SCHEDULER            entrou agora
+1732370  Task Scheduler / SESUC  AUTOMACAO_TASK_SCHEDULER            entrou agora
+1728089  Zabbix Monitor          ABERTO_NO_COI_CADEIA                inalterado
+1729991  Zabbix Monitor          ABERTO_NO_COI_CADEIA                inalterado
+1731682  Zabbix Monitor          ABERTO_NO_COI_CADEIA                inalterado
+1732244  Zabbix Monitor          ABERTO_NO_COI_CADEIA                inalterado
+1731364  Robô COI                ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL  inalterado
+1731536  Robô COI                ABERTO_NO_COI_CADEIA                inalterado
+1731585  Robô COI                ABERTO_NO_COI_CADEIA                inalterado
+1731621  Robô COI                ABERTO_NO_COI_CADEIA                inalterado
+1731627  Robô COI                ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL  inalterado
+```
+
+Os quatro do Task Scheduler recebem `DataRegistroCOI = DataAbertura`. Os nove restantes mantêm data e evidência exatamente como antes.
+
+### 70.8. `TipoAutomacaoCOI`
+
+Coluna nova, **informativa**, separada de `EvidenciaRegistroCOI`, com valores controlados:
+
+```text
+Task Scheduler / SESUC
+Zabbix Monitor
+Robo COI
+NULL  ->  exposto como 'Não automatizado' no detalhe
+```
+
+As duas colunas respondem a perguntas diferentes e por isso não foram fundidas:
+
+```text
+EvidenciaRegistroCOI  POR QUE e QUANDO o chamado entrou no indicador
+TipoAutomacaoCOI      DE ONDE ele veio
+```
+
+Um chamado do Zabbix e um do Robô COI entram ambos por `ABERTO_NO_COI_CADEIA` — a evidência não os distingue, e a modalidade sim.
+
+Registro de uma lacuna deliberada: `Criado via interface CMD` por `servicedesk` com `%GROUP=` **fora** da lista oficial fica **não classificado**, porque a modalidade oficial é a trinca inteira. `QtdCMDServiceDeskForaDaLista` conta esses casos em toda validação — 27, 25, 263 e 92 nos quatro períodos — para que a lacuna seja visível e não silenciosa.
+
+### 70.9. Validação
+
+Dezesseis asserções, `SIM` em OUT/2025, FEV/2026, MAR/2026 e JUN/2026. As nove anteriores foram preservadas; as sete novas são:
+
+```text
+10_AutomacaoNaoDuplicaSDM
+11_TaskSchedulerEntraSemPassagemPeloCOI
+12_GrupoForaDaListaNaoEntra
+13_CMDSozinhoNaoViraTaskScheduler
+14_ZabbixPermaneceTipoI
+15_RoboNaoConfundidoComTaskScheduler
+16_AutomacaoUsaDataDeAbertura
+```
+
+A asserção 15 lê direto das tabelas de parse, e não do resultado já classificado: ela testa a **disjunção das assinaturas**, não a ordem do `CASE` que as aplica. A asserção 13 repete o mesmo desempate da regra — `TOP (1)` pelo INIT mais antigo — para medir o que a regra decidiu, e não uma aproximação.
+
+Totais e consistência das agregações:
+
+```text
+OUT/2025   3782      PorMes = PorDia = PorHora = SDMsDistintos
+FEV/2026   3304      PorMes = PorDia = PorHora = SDMsDistintos
+MAR/2026   4342      PorMes = PorDia = PorHora = SDMsDistintos
+JUN/2026   3483      PorMes = PorDia = PorHora = SDMsDistintos
+
+duplicados ............................. 0
+DataRegistroCOI anterior à abertura .... 0
+elegível retido por ressalva ........... 0
+```
+
+MAR/2026, composição por evidência:
+
+```text
+ABERTO_NO_COI_CADEIA .............................. 1506
+TRANSFERIDO_PARA_COI ..............................  365
+ENTRADA_DEMONSTRAVEL_DESTINO ......................    6
+JA_ESTAVA_NO_COI_HISTORICO ........................    1
+ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL ................  584
+ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO ......  161
+AUTOMACAO_TASK_SCHEDULER .......................... 1719
+                                                   ----
+                                                    4342
+```
+
+### 70.10. Novo hash canônico
+
+```text
+e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc
+59587 chars
+8/8 blocos idênticos
+```
+
+Os oito são os sete SQLs oficiais de Registrados em `coi/queries/` mais `coi/powerbi/consulta_coi_volumetria_power_bi.sql`. O hash `74eb175d…6bc3d891`, registrado em 69.7, passa a ser **histórico**.
+
+### 70.11. O que esta seção não altera
+
+`coi/queries/consulta_coi_encerrados.sql` e `coi/queries/consulta_coi_pesquisa_satisfacao_encerrados.sql` **não foram tocadas**. Encerrados continua governado por `group_id` no instante do fechamento, que é uma pergunta diferente de "onde o chamado foi registrado".
+
+Consequência a registrar: um chamado do Task Scheduler que nasce e morre em `NSTI BD` agora conta em **Registrados** e não conta em **Encerrados**. Os dois indicadores deixam de ser comparáveis linha a linha, e isso é correto — eles medem coisas distintas. Qualquer leitura que subtraia um do outro precisa ser revista.
+
+As perguntas que os dados não respondem e que continuam abertas para a gestão estão registradas fora deste documento; a principal é se o COI deve ser considerado dono dos agendamentos que abrem direto em fila de terceiros — pergunta que esta implementação responde **sim**, por decisão informada pela gestão, e não por inferência técnica.
