@@ -24905,3 +24905,24 @@ Permaneceram na raiz, intocados: `Consulta para Auditoria.sql` (fonte original p
 ### 71.5. Pendência registrada, sem alteração
 
 `coi/powerbi/consulta_coi_volumetria_power_bi.sql` usa janela de **seis ciclos 24-24** (`@COIPBI_InicioCicloAtual`). Na mesma data, essa lógica foi identificada na Decision como regra herdada da Protect4/A2B e removida de lá. No COI **nada foi alterado**: a consulta está validada, e decidir se o painel do COI deve ou não seguir ciclo 24-24 é decisão de negócio ainda não tomada.
+
+## 72. 2026-09-18 (2ª) — estrutura sem a pasta `coi/`; histórico renomeado
+
+Somente reorganização de arquivos. Nenhum SQL, regra, bloco canônico ou painel mudou.
+
+A pasta intermediária `coi/` só repetia o escopo do repositório e foi removida. Tudo com `git mv`:
+
+```text
+coi/queries/                           -> queries/
+coi/powerbi/                           -> powerbi/
+docs/project-context/FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md
+                                       -> project-context/COI-HISTORICO-CONTEXTO-MESTRE.md
+```
+
+`docs/` deixou de existir: o COI não tem documentação funcional separada, só este histórico.
+
+Os 17 SQLs têm os **mesmos blobs** no Git antes e depois, e o bloco canônico continua `e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc`, 8/8 idênticos. Comentários de SQL que citam `coi/queries/…` — alguns dentro do bloco canônico — não foram alterados, para não mudar o hash.
+
+O README passou a citar os caminhos novos. As seções anteriores deste histórico citam os caminhos da época e não foram reescritas. A pasta antiga `Queries`, fora dos repositórios, foi excluída nesta data; `_arquivo-trabalho-coi/` foi mantida.
+
+Regra daqui para frente: trabalho do COI atualiza **somente** este arquivo.

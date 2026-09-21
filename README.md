@@ -10,33 +10,28 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 
 ```text
 .
-├── coi/
-│   ├── queries/
-│   │   ├── consulta_coi_encerrados.sql
-│   │   ├── consulta_coi_pesquisa_satisfacao_encerrados.sql
-│   │   ├── consulta_coi_registrados_detalhe.sql
-│   │   ├── consulta_coi_registrados_encerrados_diario.sql
-│   │   ├── consulta_coi_registrados_membros.sql
-│   │   ├── consulta_coi_registrados_mensal.sql
-│   │   ├── consulta_coi_registrados_por_evidencia.sql
-│   │   ├── consulta_coi_registrados_por_hora.sql
-│   │   ├── consulta_coi_registrados_por_registrador.sql
-│   │   ├── consulta_coi_registrados_total_com_tecnicos.sql
-│   │   ├── consulta_coi_registrados_universo_bruto.sql
-│   │   └── consulta_coi_registrados_validacao.sql
-│   └── powerbi/
-│       └── consulta_coi_volumetria_power_bi.sql
-│
-├── docs/
-│   └── project-context/
-│       └── FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
-│
+├── queries/
+│   ├── consulta_coi_encerrados.sql
+│   ├── consulta_coi_pesquisa_satisfacao_encerrados.sql
+│   ├── consulta_coi_registrados_detalhe.sql
+│   ├── consulta_coi_registrados_encerrados_diario.sql
+│   ├── consulta_coi_registrados_membros.sql
+│   ├── consulta_coi_registrados_mensal.sql
+│   ├── consulta_coi_registrados_por_evidencia.sql
+│   ├── consulta_coi_registrados_por_hora.sql
+│   ├── consulta_coi_registrados_por_registrador.sql
+│   ├── consulta_coi_registrados_total_com_tecnicos.sql
+│   ├── consulta_coi_registrados_universo_bruto.sql
+│   └── consulta_coi_registrados_validacao.sql
+├── powerbi/
+│   └── consulta_coi_volumetria_power_bi.sql
+├── project-context/
+│   └── COI-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
 ├── support/
 │   ├── consulta_logs_chamados_listados.sql
 │   ├── consulta_status_chamados.sql
 │   ├── consulta_status_hold.sql
 │   └── consulta_tipos_chamado.sql
-│
 ├── README.md
 └── .git/
 ```
@@ -59,22 +54,22 @@ Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo,
 
 | Arquivo | Indicador | Saída |
 |---|---|---|
-| [`coi/queries/consulta_coi_registrados_mensal.sql`](coi/queries/consulta_coi_registrados_mensal.sql) | Registrados por mês, separando Incidentes e Solicitações | `Ano, Mes, MesAno, Incidentes, Solicitacoes, Total` |
-| [`coi/queries/consulta_coi_registrados_encerrados_diario.sql`](coi/queries/consulta_coi_registrados_encerrados_diario.sql) | Registrados × Encerrados por dia (I e R juntos) | `Dia, Registrados, Encerrados` |
-| [`coi/queries/consulta_coi_registrados_por_hora.sql`](coi/queries/consulta_coi_registrados_por_hora.sql) | Registrados por hora, dias consolidados | `Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados` |
+| [`queries/consulta_coi_registrados_mensal.sql`](queries/consulta_coi_registrados_mensal.sql) | Registrados por mês, separando Incidentes e Solicitações | `Ano, Mes, MesAno, Incidentes, Solicitacoes, Total` |
+| [`queries/consulta_coi_registrados_encerrados_diario.sql`](queries/consulta_coi_registrados_encerrados_diario.sql) | Registrados × Encerrados por dia (I e R juntos) | `Dia, Registrados, Encerrados` |
+| [`queries/consulta_coi_registrados_por_hora.sql`](queries/consulta_coi_registrados_por_hora.sql) | Registrados por hora, dias consolidados | `Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados` |
 
 **Auditoria** — a mesma população, por outros ângulos, para provar o número:
 
 | Arquivo | Para que serve |
 |---|---|
-| [`coi/queries/consulta_coi_registrados_detalhe.sql`](coi/queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
-| [`coi/queries/consulta_coi_registrados_por_registrador.sql`](coi/queries/consulta_coi_registrados_por_registrador.sql) | A mesma população agrupada por quem registrou (`log_agent`) |
-| [`coi/queries/consulta_coi_registrados_por_evidencia.sql`](coi/queries/consulta_coi_registrados_por_evidencia.sql) | Composição do total por classe de evidência |
-| [`coi/queries/consulta_coi_registrados_validacao.sql`](coi/queries/consulta_coi_registrados_validacao.sql) | Uma linha de sanidade com validações automáticas |
+| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
+| [`queries/consulta_coi_registrados_por_registrador.sql`](queries/consulta_coi_registrados_por_registrador.sql) | A mesma população agrupada por quem registrou (`log_agent`) |
+| [`queries/consulta_coi_registrados_por_evidencia.sql`](queries/consulta_coi_registrados_por_evidencia.sql) | Composição do total por classe de evidência |
+| [`queries/consulta_coi_registrados_validacao.sql`](queries/consulta_coi_registrados_validacao.sql) | Uma linha de sanidade com validações automáticas |
 
 ### Encerrados pelo COI
 
-Diferente das consultas acima, [`coi/queries/consulta_coi_encerrados.sql`](coi/queries/consulta_coi_encerrados.sql) não conta: ela **lista**. Devolve **uma linha por SDM** encerrado pelo COI, para conferência caso a caso.
+Diferente das consultas acima, [`queries/consulta_coi_encerrados.sql`](queries/consulta_coi_encerrados.sql) não conta: ela **lista**. Devolve **uma linha por SDM** encerrado pelo COI, para conferência caso a caso.
 
 A regra é a seguinte: um chamado é considerado encerrado pelo COI quando:
 
@@ -87,7 +82,7 @@ O período é parametrizável, com intervalo semiaberto (`>= início` e `< fim`)
 
 ### Painel
 
-Para o painel existe [`coi/powerbi/consulta_coi_volumetria_power_bi.sql`](coi/powerbi/consulta_coi_volumetria_power_bi.sql), que entrega os indicadores em um único result set discriminado pela coluna `TipoResultado`.
+Para o painel existe [`powerbi/consulta_coi_volumetria_power_bi.sql`](powerbi/consulta_coi_volumetria_power_bi.sql), que entrega os indicadores em um único result set discriminado pela coluna `TipoResultado`.
 
 ## Consultas de apoio
 
@@ -138,18 +133,20 @@ As consultas de auditoria servem para confirmar a população e validar se os to
 
 ## Convenções do projeto
 
-- `coi/queries/`: consultas executáveis relacionadas ao COI.
-- `coi/powerbi/`: consultas de painel e consolidação.
+- `queries/`: consultas executáveis relacionadas ao COI.
+- `powerbi/`: consultas de painel e consolidação.
 - `support/`: consultas auxiliares.
-- `docs/`: histórico, contexto e material de apoio.
+- `project-context/`: Histórico Mestre do COI.
 
 Ao alterar uma regra de cálculo, atualize também a documentação correspondente e valide o impacto nos indicadores e no painel.
 
 ## Histórico Mestre
 
 O histórico do projeto fica em
-[`docs/project-context/FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md`](docs/project-context/FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md).
+[`project-context/COI-HISTORICO-CONTEXTO-MESTRE.md`](project-context/COI-HISTORICO-CONTEXTO-MESTRE.md).
 
 - Ele é **append-only**: cada intervenção vira uma seção nova, e seções antigas não são reescritas.
 - Trabalhos do COI atualizam **somente** este histórico. Decision e A2B mantêm o seu, nos respectivos repositórios.
-- As seções anteriores à separação dos repositórios foram herdadas do documento compartilhado da época em que os três núcleos viviam em `Queries`. Elas contêm registros de Decision e Protect4 e são mantidas como **legado histórico**, sem reescrita. O nome do arquivo também é herdado dessa época.
+- As seções anteriores à separação dos repositórios foram herdadas do documento compartilhado da época em que os três núcleos viviam em `Queries`. Elas contêm registros de Decision e Protect4 e são mantidas como **legado histórico**, sem reescrita. Caminhos citados nelas (`coi/queries/`, `docs/project-context/`, …) descrevem a estrutura da época.
+- O arquivo se chamava `FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md`, nome herdado do documento compartilhado; foi renomeado em 2026-09-18.
+- Os comentários de cabeçalho de algumas consultas ainda citam `coi/queries/…`. Eles não foram alterados porque parte deles fica dentro do bloco canônico, conferido por SHA256; hoje esses arquivos ficam em `queries/`.
