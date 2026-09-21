@@ -4,7 +4,7 @@ Repositório com consultas SQL, documentações e arquivos de validação usados
 
 O objetivo do projeto é manter, em um só lugar, as consultas usadas para identificar chamados registrados e encerrados pelo COI, a explicação das regras aplicadas e os materiais de conferência contra os relatórios recebidos.
 
-Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm repositórios próprios (`Extracao_de_dados_Decision` e `Extracao_de_dados_A2B`) e nada deles vive aqui. A antiga pasta `Queries`, onde os três núcleos conviviam, **não é mais fonte operacional** do COI — desde 2026-09-18 a fonte oficial é este repositório.
+Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm repositórios próprios (`Extracao_de_dados_Decision` e `Extracao_de_dados_A2B`) e nada deles vive aqui.
 
 ## Estrutura do repositório
 
@@ -148,5 +148,4 @@ O histórico do projeto fica em
 - Ele é **append-only**: cada intervenção vira uma seção nova, e seções antigas não são reescritas.
 - Trabalhos do COI atualizam **somente** este histórico. Decision e A2B mantêm o seu, nos respectivos repositórios.
 - As seções anteriores à separação dos repositórios foram herdadas do documento compartilhado da época em que os três núcleos viviam em `Queries`. Elas contêm registros de Decision e Protect4 e são mantidas como **legado histórico**, sem reescrita. Caminhos citados nelas (`coi/queries/`, `docs/project-context/`, …) descrevem a estrutura da época.
-- O arquivo se chamava `FAIA-FARC-HISTORICO-CONTEXTO-MESTRE.md`, nome herdado do documento compartilhado; foi renomeado em 2026-09-18.
-- Os comentários de cabeçalho de algumas consultas ainda citam `coi/queries/…`. Eles não foram alterados porque parte deles fica dentro do bloco canônico, conferido por SHA256; hoje esses arquivos ficam em `queries/`.
+- Alguns comentários de cabeçalho das consultas citam caminhos antigos. Eles fazem parte do bloco canônico, conferido por SHA256, e por isso não acompanham mudanças de pasta; os arquivos ficam em `queries/` e `powerbi/`.
