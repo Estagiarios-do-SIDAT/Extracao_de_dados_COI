@@ -1,524 +1,175 @@
 USE mdb;
 SET NOCOUNT ON;
 
+--------------------------------------------------------------------------------
+-- VERSAO POWER BI de queries/consulta_coi_registrados_por_evidencia.sql
+--
+-- A regra e a da consulta de /queries, que e a fonte de verdade. Este arquivo
+-- e o texto dela sem alteracao, exceto pelas adaptacoes abaixo, marcadas no
+-- corpo com [POWER BI]. Se esta versao e a fonte divergirem, vale a fonte.
+--
+-- Adaptacoes:
+--   - periodo automatico: os @PBI_QuantidadeMeses meses de calendario COMPLETOS
+--     anteriores ao mes corrente, no lugar das datas digitadas;
+--   - saida: a fonte ja devolve um unico result set, que sai sem alteracao.
+--
+-- Power BI: conector SQL Server, banco mdb, modo Importacao, este arquivo
+-- inteiro no campo Instrucao SQL, Adicionar colunas de relacao desmarcado.
+-- Somente leitura. Batch unico, sem GO.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- [POWER BI] PERIODO AUTOMATICO
+--
+-- A fonte recebe o periodo digitado, em meses de calendario com fim EXCLUSIVO.
+-- Aqui ele e calculado a cada atualizacao, na mesma forma:
+--
+--     fim    (exclusivo) = dia 1 do mes corrente, 00:00:00, horario do Brasil
+--     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim
+--
+-- Entram so meses COMPLETOS: o mes em andamento fica de fora. Para mudar a
+-- cobertura, altere apenas @PBI_QuantidadeMeses.
+--------------------------------------------------------------------------------
+DECLARE @PBI_QuantidadeMeses int = 6;
+
+DECLARE @PBI_HojeBR date =
+    CONVERT(date, DATEADD(HOUR, -3, SYSUTCDATETIME()));
+DECLARE @PBI_FimBR datetime2(0) =
+    CONVERT(datetime2(0), DATEFROMPARTS(YEAR(@PBI_HojeBR), MONTH(@PBI_HojeBR), 1));
+DECLARE @PBI_InicioBR datetime2(0) =
+    DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR);
+
+
 /*
 ================================================================================
-COI - VOLUMETRIA DE CHAMADOS  (fonte do Power BI)
+COI - REGISTRADOS - por evidencia de passagem pelo COI (auditoria)
 ================================================================================
 
-Uso:
-  - Power BI Desktop
-  - Conector: SQL Server
-  - Banco de dados: mdb
-  - Modo: Importacao
-  - Campo "Instrucao SQL": colar este arquivo inteiro
-  - "Adicionar colunas de relacao": desmarcado
+Prova de ONDE veio cada parcela da populacao: quantos chamados entraram por
+nascer no COI, quantos por transferencia, e quantos pelo fallback.
 
-Periodo:
-  - Janela DINAMICA: sempre os seis ultimos ciclos COMPLETOS.
-  - Cada ciclo comeca no dia 24 e termina no dia 23 do mes seguinte.
-  - O ciclo atualmente em andamento NAO entra.
-  - Mesma regra de protect4/powerbi/consulta_faia_farc_power_bi.sql.
-  - Nao ha data fixa no arquivo: nada precisa ser editado a cada mes.
+Saida: UM unico result set, em duas secoes.
+    Secao, EvidenciaRegistroCOI, AliasEvidencia, ForcaDaEvidencia,
+    Incidentes, Solicitacoes, Total
 
-  A janela decide QUANTO HISTORICO entra na consulta. Ela nao vira dimensao:
-  o agrupamento dos graficos continua sendo por mes, dia e hora, exatamente
-  como na consulta manual.
+COMO LER - secao 1, NO INDICADOR
 
-Saida:
-  - UM UNICO result set, com a coluna discriminadora [TipoResultado].
-  - Tres conjuntos logicos empilhados por UNION ALL:
-        MENSAL   -> Grafico 1: registrados por mes, Incidentes x Solicitacoes
-        DIARIO   -> Grafico 2: registrados x encerrados por dia (I e R juntos)
-        HORARIO  -> Grafico 3: registrados por hora, consolidado por mes
-  Nos tres, "registrados" e agrupado por DataRegistroCOI.
-  - Colunas que nao se aplicam a um tipo de linha vem NULL.
-  - Nenhum bloco de diagnostico.
+    Por CADEIA REAL de grupo, que e a evidencia principal:
+      ABERTO_NO_COI_CADEIA          a origem do 1o evento de grupo ja e COI
+      JA_ESTAVA_NO_COI_HISTORICO    a origem do 1o evento e o nome POSTERIOR da
+                                    fila COI antiga, e o chamado abriu antes da
+                                    transicao: ele ja era COI na abertura
+      TRANSFERIDO_PARA_COI          nasceu fora; conta na 1a entrada da vida
+      ENTRADA_DEMONSTRAVEL_DESTINO  a origem nao prova a 1a entrada - ilegivel no
+                                    texto, ou dentro da janela de renomeacao -
+                                    mas o destino em fila COI prova a entrada
 
-  No Power BI, o caminho natural e referenciar esta consulta tres vezes no
-  Power Query, filtrando [TipoResultado] em cada copia e removendo as colunas
-  nulas. Isso reproduz as tres tabelas sem precisar de tres conexoes.
+    Por FALLBACK DE ESTADO, so quando nao ha nenhum evento de grupo:
+      ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL            permaneceu no COI atual
+      ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO  UUID antigo, aberto antes
+                                                    da transicao de contrato
 
-ATENCAO - MESES DE BORDA (nao e defeito, e consequencia da janela):
-  Os ciclos comecam no dia 24, entao a janela corta o primeiro e o ultimo mes
-  ao meio. O mes inicial entra apenas do dia 24 em diante e o mes final apenas
-  ate o dia 23. Nos graficos MENSAL e HORARIO essas duas pontas aparecem com
-  volume menor que um mes cheio. Ao comparar meses, descarte as bordas ou
-  compare somente os meses inteiros do miolo.
+COMO LER - secao 2, RESSALVA (fora do indicador)
 
-Regra de negocio - REGISTRADOS: o bloco canonico de coi/queries/, embutido
-  VERBATIM na secao [4b]. O mesmo texto que roda nos sete SQLs oficiais, com o
-  mesmo SHA256 entre os marcadores INICIO/FIM REGRA CANONICA DE REGISTRADOS COI.
-  Se este arquivo e os sete divergirem, os sete e que valem.
+      SEM_RECONSTRUCAO_EVENTO_ILEGIVEL  houve evento de grupo, nenhum legivel,
+                                        ou ancora ilegivel antes do 1o legivel
+      AMBIGUO_JANELA_TRANSICAO          aberto dentro da janela de renomeacao E
+                                        sem entrada demonstravel em fila COI
+      CONTRADICAO_INIT_x_CADEIA         a origem historica sugere COI, mas o
+                                        %GROUP= do INIT nomeia fila nao-COI
+      INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA
+                                        aberto antes da transicao, mas o INIT ja
+                                        traz 'CONTRATO 7/2023 - COI' - nome que
+                                        a fila so recebeu depois
 
-  O eixo temporal de Registrados e a DataRegistroCOI - a primeira entrada do
-  chamado no universo logico COI, uma vez por SDM ao longo da vida - e nao mais
-  call_req.open_date. Reentrada nao gera segunda contagem.
+    As classes sao MUTUAMENTE EXCLUSIVAS - a hierarquia do bloco canonico
+    garante isso - entao a soma da secao 1 reproduz o total do indicador, sem
+    duplicar SDM.
 
-Regra de negocio - ENCERRADOS: inalterada nesta rodada. Continua vindo de
-  #COIPBI_Fatos, secoes [1] a [4].
+    Dois numeros a vigiar na manutencao. O peso do FALLBACK: se crescer muito, o
+    historico de grupo parou de chegar e a regra passa a se apoiar no estado
+    atual sem que ninguem perceba. E o peso da RESSALVA: ele mede o que a regra
+    se recusa a afirmar, e nao deve crescer em silencio.
 
-Temporarias: as de Encerrados usam o prefixo #COIPBI_, que nao colide com a
-  Protect4 (#PBI_*) nem com a Decision (*_DEC). As do bloco canonico mantem os
-  nomes originais (#RegCand, #RegEv, #Registrados, ...) porque o bloco entra sem
-  ser tocado; cada uma comeca com IF OBJECT_ID(...) DROP TABLE e o Power BI
-  executa numa conexao propria. Somente leitura. Batch unico. Nao existe GO.
+AS COLUNAS DE AUDITORIA NAO SAO CRITERIO
+
+    log_agent, grupo atual e data de entrada no COI viajam junto com a base
+    canonica APENAS para exibicao e conferencia. Nenhuma delas aparece em
+    predicado ou na classificacao: a populacao e exatamente a mesma das
+    consultas de indicador, sem um chamado a mais nem a menos.
+
+HORIZONTE
+    Nao ha mais parametro de horizonte. DataRegistroCOI e um INSTANTE fixo do
+    chamado, entao o mes dele nao muda porque a janela consultada cresceu - a
+    imutabilidade que @HorizonteMensal produzia por parametro agora e estrutural.
+    Auditoria e indicador batem por construcao, em qualquer tamanho de janela.
+
+REGRA DE "REGISTRADO PELO COI" - canonica, baseada no sistema fonte
+
+    type IN ('I','R')
+    E  PRIMEIRA ENTRADA NA FILA DO COI, em toda a vida do chamado, caindo
+       dentro da janela consultada
+    -> uma linha por SDM, sem filtro de analista, categoria, motivo ou status.
+
+    O eixo NAO e call_req.open_date: e a DataRegistroCOI reconstruida. Um SDM
+    conta UMA vez, na primeira entrada; reentrada nao conta de novo.
+
+    A evidencia PRINCIPAL e a cadeia real de mudancas de grupo em act_log. O
+    '%GROUP=' do INIT e apenas AUXILIAR - ha chamados cujo INIT declara uma fila
+    que a primeira mudanca de grupo contradiz, e nesses a cadeia vence. Quando
+    nao existe NENHUM evento de grupo, aplica-se o fallback de estado autorizado
+    pela gestao do COI: a fila em que o chamado permaneceu.
+
+    O detalhamento, os aliases historicos, a janela de transicao de contrato e o
+    motivo de cada decisao estao no bloco delimitado por INICIO/FIM REGRA
+    CANONICA DE REGISTRADOS COI, IDENTICO byte a byte nas SETE consultas de
+    Registrados e conferivel por SHA256.
+
+O RSP HISTORICO NAO E O ALVO
+
+    Os relatorios antigos do fornecedor vieram de OUTRA ferramenta/base, o
+    proprio fornecedor confirmou inconsistencias, e a aba DADOS guarda apenas
+    valores digitados - sem pivot, conexao ou formula que revele a regra. Eles
+    valem como referencia externa de reconciliacao; a definicao tecnica do
+    indicador e esta consulta, sobre o sistema fonte atual.
+
+    Nenhum filtro aqui existe para aproximar numero de relatorio antigo.
+
+LIMITE CONHECIDO - historico nao e imutavel
+
+    Uma execucao de hoje pode divergir de um relatorio emitido meses atras se
+    chamados foram corrigidos ou incluidos depois com open_date retroativo. O
+    horizonte de elegibilidade impede que MOVIMENTACAO posterior mude um periodo
+    fechado, mas nao reconstroi um snapshot antigo. Se for exigido que meses
+    fechados nunca mudem, o caminho e snapshot mensal persistido no fechamento -
+    decisao de projeto, nao implementada aqui.
+
+Somente leitura. Batch unico. Nao existe GO neste arquivo.
 ================================================================================
 */
 
-
 --------------------------------------------------------------------------------
--- [0] JANELA DINAMICA - seis ultimos ciclos completos
+-- [0] PARAMETROS
 --
--- Regra copiada de protect4/powerbi/consulta_faia_farc_power_bi.sql:
---   ciclo = dia 24 de um mes ate o dia 23 do mes seguinte;
---   o fim da janela e o INICIO do ciclo corrente, exclusivo, o que remove o
---   ciclo em andamento;
---   o inicio da janela e seis meses antes desse marco.
+-- Datas em horario do Brasil. Intervalo SEMIABERTO: >= inicio e < fim.
+-- Nao usar 23:59:59 como fim: o chamado do ultimo segundo do dia ficaria de fora.
 --
--- Exemplo do mecanismo (nao ha data fixa no codigo): executando num dia 19,
--- como DAY < 24, o ciclo corrente comecou no dia 24 do mes ANTERIOR; a janela
--- termina nesse dia 24 (exclusivo) e comeca seis meses antes dele.
+-- open_date e close_date em dbo.call_req sao epoch UTC em segundos (int).
+-- Brasil = UTC-3 fixo (sem horario de verao desde 2019), mesma conversao ja
+-- validada em decision/ e protect4/.
 --------------------------------------------------------------------------------
-DECLARE @COIPBI_HorasBrasilParaUTC int = 3;
-DECLARE @COIPBI_Epoch datetime2(0) = '1970-01-01 00:00:00';
+DECLARE @HorasBrasilParaUTC int = 3;
+DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
 
-DECLARE @COIPBI_HojeBrasil date =
-    CONVERT(date, DATEADD(HOUR, -@COIPBI_HorasBrasilParaUTC, SYSUTCDATETIME()));
+-- [POWER BI] Periodo automatico, calculado no inicio do arquivo.
+DECLARE @InicioBR datetime2(0) = @PBI_InicioBR;   -- inclusivo
+DECLARE @FimBR    datetime2(0) = @PBI_FimBR;      -- EXCLUSIVO
 
-DECLARE @COIPBI_InicioCicloAtual date =
-    CASE
-        WHEN DAY(@COIPBI_HojeBrasil) >= 24
-            THEN DATEFROMPARTS(YEAR(@COIPBI_HojeBrasil), MONTH(@COIPBI_HojeBrasil), 24)
-        ELSE DATEADD(
-                 MONTH,
-                 -1,
-                 DATEFROMPARTS(YEAR(@COIPBI_HojeBrasil), MONTH(@COIPBI_HojeBrasil), 24)
-             )
-    END;
-
--- Fim EXCLUSIVO da janela = inicio do ciclo corrente (que fica de fora).
-DECLARE @COIPBI_FimBR datetime2(0) =
-    CONVERT(datetime2(0), @COIPBI_InicioCicloAtual);
-
--- Inicio INCLUSIVO da janela = seis ciclos antes.
-DECLARE @COIPBI_InicioBR datetime2(0) =
-    DATEADD(MONTH, -6, @COIPBI_FimBR);
-
--- Epoch calculado UMA unica vez; os filtros comparam int com int.
-DECLARE @COIPBI_InicioEpoch int =
-    DATEDIFF(SECOND, @COIPBI_Epoch, DATEADD(HOUR, @COIPBI_HorasBrasilParaUTC, @COIPBI_InicioBR));
-DECLARE @COIPBI_FimEpoch int =
-    DATEDIFF(SECOND, @COIPBI_Epoch, DATEADD(HOUR, @COIPBI_HorasBrasilParaUTC, @COIPBI_FimBR));
-
--- Identificacao do grupo COI - igual a consulta manual.
-DECLARE @COIPBI_Nome  nvarchar(200) = N'COI';
-DECLARE @COIPBI_Grupo varbinary(16) = 0x3C11B3A9EBCE5D498E2F7D7FF385F967;
+DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
+DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
 
 
 --------------------------------------------------------------------------------
--- [1] Resolucao e VALIDACAO do grupo COI
---
--- Grupos sao contatos em dbo.ca_contact. O nome fica em last_name; userid entra
--- como alternativa. Aceita as formas vistas nos relatorios: "COI", "NSTI COI"
--- e sufixo "- COI".
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_Grupos') IS NOT NULL DROP TABLE #COIPBI_Grupos;
-CREATE TABLE #COIPBI_Grupos (
-    group_uuid varbinary(16)  NOT NULL PRIMARY KEY,
-    grupo_nome nvarchar(200)  COLLATE DATABASE_DEFAULT NULL
-);
-
-INSERT INTO #COIPBI_Grupos (group_uuid, grupo_nome)
-SELECT c.contact_uuid, nome.grupo_nome
-FROM dbo.ca_contact AS c
-CROSS APPLY (
-    SELECT grupo_nome = LTRIM(RTRIM(COALESCE(NULLIF(c.last_name, N''), NULLIF(c.userid, N''), N'')))
-) AS nome
-WHERE c.contact_uuid IS NOT NULL
-  AND nome.grupo_nome <> N''
-  AND (
-        nome.grupo_nome COLLATE Latin1_General_CI_AI = @COIPBI_Nome COLLATE Latin1_General_CI_AI
-     OR nome.grupo_nome COLLATE Latin1_General_CI_AI LIKE N'NSTI ' + @COIPBI_Nome COLLATE Latin1_General_CI_AI
-     OR nome.grupo_nome COLLATE Latin1_General_CI_AI LIKE N'%- ' + @COIPBI_Nome COLLATE Latin1_General_CI_AI
-      );
-
--- Sem grupo resolvido nao ha consulta possivel: para em vez de alimentar o
--- painel com zeros silenciosos.
-IF NOT EXISTS (SELECT 1 FROM #COIPBI_Grupos)
-BEGIN
-    RAISERROR(N'Grupo COI nao encontrado em dbo.ca_contact a partir de @COIPBI_Nome. Ajuste @COIPBI_Nome e atualize de novo.', 16, 1);
-    RETURN;
-END;
-
--- Conferencia do UUID herdado. Severidade 10 = mensagem informativa: nao
--- interrompe a execucao e nao cria result set.
-IF @COIPBI_Grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM #COIPBI_Grupos WHERE group_uuid = @COIPBI_Grupo)
-BEGIN
-    DECLARE @COIPBI_NomeDoUuid nvarchar(200) =
-        (SELECT TOP 1 LTRIM(RTRIM(COALESCE(NULLIF(c.last_name, N''), NULLIF(c.userid, N''), N'?')))
-         FROM dbo.ca_contact AS c WHERE c.contact_uuid = @COIPBI_Grupo);
-
-    RAISERROR(N'AVISO: o UUID informado em @COIPBI_Grupo NAO corresponde a nenhum grupo COI resolvido pelo nome. Cadastro do UUID: %s. A consulta seguiu usando os grupos resolvidos por @COIPBI_Nome.',
-              10, 1, @COIPBI_NomeDoUuid);
-END;
-
--- Nomes do COI como texto, para casar com o que aparece escrito no act_log.
-IF OBJECT_ID('tempdb..#COIPBI_Nomes') IS NOT NULL DROP TABLE #COIPBI_Nomes;
-SELECT DISTINCT g.grupo_nome COLLATE Latin1_General_CI_AI AS grupo_nome
-INTO #COIPBI_Nomes
-FROM #COIPBI_Grupos AS g
-WHERE g.grupo_nome IS NOT NULL;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Nomes ON #COIPBI_Nomes(grupo_nome);
-
-
---------------------------------------------------------------------------------
--- [2] Universo de chamados da janela
---
--- Precisa cobrir os dois lados do grafico diario: abertos na janela
--- (Registrados) e fechados na janela (Encerrados) - e um chamado fechado na
--- janela pode ter sido aberto bem antes dela.
---
--- SARGABILIDADE: a consulta manual resolve isso com um OR entre open_date e
--- close_date, o que costuma forcar varredura da call_req inteira. Aqui os dois
--- lados viram DOIS filtros de intervalo independentes unidos por UNION, cada um
--- comparando uma unica coluna com constantes int - forma que o otimizador
--- consegue transformar em busca por indice. O conjunto resultante e o MESMO;
--- UNION (nao ALL) elimina o chamado que satisfaz os dois lados.
---
--- Tipos I (Incidente) e R (Solicitacao), como na consulta manual.
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_Ids') IS NOT NULL DROP TABLE #COIPBI_Ids;
-
-SELECT r.id
-INTO #COIPBI_Ids
-FROM dbo.call_req AS r
-WHERE r.[type] IN ('I', 'R')
-  AND r.open_date >= @COIPBI_InicioEpoch
-  AND r.open_date <  @COIPBI_FimEpoch
-
-UNION
-
-SELECT r.id
-FROM dbo.call_req AS r
-WHERE r.[type] IN ('I', 'R')
-  AND r.open_date IS NOT NULL
-  AND r.close_date >= @COIPBI_InicioEpoch
-  AND r.close_date <  @COIPBI_FimEpoch;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Ids ON #COIPBI_Ids(id);
-
-IF OBJECT_ID('tempdb..#COIPBI_CR') IS NOT NULL DROP TABLE #COIPBI_CR;
-
-SELECT
-    r.id,
-    r.persid,
-    r.ref_num,
-    r.[type],
-    r.group_id,
-    r.open_date,
-    r.close_date,
-    DATEADD(HOUR, -@COIPBI_HorasBrasilParaUTC, DATEADD(SECOND, r.open_date, @COIPBI_Epoch)) AS abertura_br,
-    CASE WHEN r.close_date IS NULL THEN NULL
-         ELSE DATEADD(HOUR, -@COIPBI_HorasBrasilParaUTC, DATEADD(SECOND, r.close_date, @COIPBI_Epoch))
-    END AS fechamento_br
-INTO #COIPBI_CR
-FROM #COIPBI_Ids AS p
-JOIN dbo.call_req AS r
-    ON r.id = p.id;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_CR_id ON #COIPBI_CR(id);
-CREATE INDEX IX_COIPBI_CR_persid ON #COIPBI_CR(persid);
-
-
---------------------------------------------------------------------------------
--- [3] Historico de transferencia de GRUPO
---
--- Fonte: dbo.act_log, tipo 'TR', com ancora textual explicita de mudanca de
--- GRUPO. A ancora evita confundir troca de RESPONSAVEL com troca de GRUPO - as
--- duas gravam act_log 'TR'. Nao existe coluna de historico de grupo em
--- call_req: o grupo antigo so existe no texto do log (e, quando instaladas, nas
--- fontes de auditoria de [3.3]).
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_GrupoRaw') IS NOT NULL DROP TABLE #COIPBI_GrupoRaw;
-
-SELECT
-    b.id,
-    al.system_time AS evento_epoch,
-    CONVERT(nvarchar(400), SUBSTRING(txt.texto_log, ancora.posicao, 400)) AS resto
-INTO #COIPBI_GrupoRaw
-FROM #COIPBI_CR AS b
-JOIN dbo.act_log AS al
-    ON al.call_req_id = b.persid
-CROSS APPLY (
-    SELECT texto_log =
-        CONVERT(nvarchar(max), ISNULL(al.description, N'')) + N' ' +
-        CONVERT(nvarchar(max), ISNULL(al.action_desc,  N''))
-) AS txt
-CROSS APPLY (
-    SELECT posicao = CASE
-        WHEN CHARINDEX(N'Grupo de', txt.texto_log COLLATE Latin1_General_CI_AI) > 0
-            THEN CHARINDEX(N'Grupo de', txt.texto_log COLLATE Latin1_General_CI_AI) + LEN(N'Grupo de')
-        WHEN CHARINDEX(N'Grupo alterado de', txt.texto_log COLLATE Latin1_General_CI_AI) > 0
-            THEN CHARINDEX(N'Grupo alterado de', txt.texto_log COLLATE Latin1_General_CI_AI) + LEN(N'Grupo alterado de')
-        WHEN CHARINDEX(N'Grupo transferido de', txt.texto_log COLLATE Latin1_General_CI_AI) > 0
-            THEN CHARINDEX(N'Grupo transferido de', txt.texto_log COLLATE Latin1_General_CI_AI) + LEN(N'Grupo transferido de')
-        WHEN CHARINDEX(N'Group from', txt.texto_log COLLATE Latin1_General_CI_AI) > 0
-            THEN CHARINDEX(N'Group from', txt.texto_log COLLATE Latin1_General_CI_AI) + LEN(N'Group from')
-        WHEN CHARINDEX(N'Group changed from', txt.texto_log COLLATE Latin1_General_CI_AI) > 0
-            THEN CHARINDEX(N'Group changed from', txt.texto_log COLLATE Latin1_General_CI_AI) + LEN(N'Group changed from')
-        ELSE 0
-    END
-) AS ancora
-WHERE al.system_time IS NOT NULL
-  AND al.type = 'TR'
-  AND ancora.posicao > 0
-  AND (b.open_date  IS NULL OR al.system_time >= b.open_date)
-  AND (b.close_date IS NULL OR al.system_time <= b.close_date);
-
-CREATE INDEX IX_COIPBI_GrupoRaw_id_epoch ON #COIPBI_GrupoRaw(id, evento_epoch);
-
---------------------------------------------------------------------------------
--- [3.1] Extracao de origem e destino - formato com aspas
---       Grupo de 'A' para 'B'
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_GrupoEventos') IS NOT NULL DROP TABLE #COIPBI_GrupoEventos;
-
-SELECT
-    g.id,
-    g.evento_epoch,
-    CONVERT(nvarchar(200), LTRIM(RTRIM(origem.nome)))  AS grupo_origem,
-    CONVERT(nvarchar(200), LTRIM(RTRIM(destino.nome))) AS grupo_destino
-INTO #COIPBI_GrupoEventos
-FROM #COIPBI_GrupoRaw AS g
-CROSS APPLY (SELECT q1 = CHARINDEX(N'''', g.resto)) AS c1
-CROSS APPLY (SELECT q2 = CASE WHEN c1.q1 > 0 THEN CHARINDEX(N'''', g.resto, c1.q1 + 1) ELSE 0 END) AS c2
-CROSS APPLY (
-    SELECT nome = CASE WHEN c2.q2 > c1.q1 THEN SUBSTRING(g.resto, c1.q1 + 1, c2.q2 - c1.q1 - 1) ELSE N'' END
-) AS origem
-CROSS APPLY (
-    SELECT posicao = CASE
-        WHEN c2.q2 > 0 AND CHARINDEX(N' para ', g.resto COLLATE Latin1_General_CI_AI, c2.q2) > 0
-            THEN CHARINDEX(N' para ', g.resto COLLATE Latin1_General_CI_AI, c2.q2)
-        WHEN c2.q2 > 0
-            THEN CHARINDEX(N' to ', g.resto COLLATE Latin1_General_CI_AI, c2.q2)
-        ELSE 0
-    END
-) AS separador
-CROSS APPLY (SELECT q3 = CASE WHEN separador.posicao > 0 THEN CHARINDEX(N'''', g.resto, separador.posicao) ELSE 0 END) AS c3
-CROSS APPLY (SELECT q4 = CASE WHEN c3.q3 > 0 THEN CHARINDEX(N'''', g.resto, c3.q3 + 1) ELSE 0 END) AS c4
-CROSS APPLY (
-    SELECT nome = CASE WHEN c4.q4 > c3.q3 THEN SUBSTRING(g.resto, c3.q3 + 1, c4.q4 - c3.q3 - 1) ELSE N'' END
-) AS destino
-WHERE c1.q1 > 0
-  AND c2.q2 > c1.q1
-  AND separador.posicao > 0
-  AND c3.q3 > 0
-  AND c4.q4 > c3.q3
-  AND NULLIF(LTRIM(RTRIM(origem.nome)),  N'') IS NOT NULL
-  AND NULLIF(LTRIM(RTRIM(destino.nome)), N'') IS NOT NULL;
-
---------------------------------------------------------------------------------
--- [3.2] Mesma extracao para logs antigos sem aspas
---       Grupo de COI para Fornecedores - Decision
---------------------------------------------------------------------------------
-INSERT INTO #COIPBI_GrupoEventos (id, evento_epoch, grupo_origem, grupo_destino)
-SELECT
-    g.id,
-    g.evento_epoch,
-    CONVERT(nvarchar(200), LEFT(LTRIM(RTRIM(partes.origem)),  200)),
-    CONVERT(nvarchar(200), LEFT(LTRIM(RTRIM(partes.destino)), 200))
-FROM #COIPBI_GrupoRaw AS g
-CROSS APPLY (
-    SELECT
-        posicao = CASE
-            WHEN CHARINDEX(N' para ', g.resto COLLATE Latin1_General_CI_AI) > 0
-                THEN CHARINDEX(N' para ', g.resto COLLATE Latin1_General_CI_AI)
-            ELSE CHARINDEX(N' to ', g.resto COLLATE Latin1_General_CI_AI)
-        END,
-        largura = CASE
-            WHEN CHARINDEX(N' para ', g.resto COLLATE Latin1_General_CI_AI) > 0
-                THEN LEN(N' para ')
-            ELSE LEN(N' to ')
-        END
-) AS sep
-CROSS APPLY (
-    SELECT
-        origem  = CASE WHEN sep.posicao > 1 THEN SUBSTRING(g.resto, 1, sep.posicao - 1) ELSE N'' END,
-        destino = CASE WHEN sep.posicao > 0 THEN SUBSTRING(g.resto, sep.posicao + sep.largura, 400) ELSE N'' END
-) AS partes
-WHERE CHARINDEX(N'''', g.resto) = 0
-  AND sep.posicao > 1
-  AND NULLIF(LTRIM(RTRIM(partes.origem)),  N'') IS NOT NULL
-  AND NULLIF(LTRIM(RTRIM(partes.destino)), N'') IS NOT NULL;
-
---------------------------------------------------------------------------------
--- [3.3] Reforco opcional pelas fontes de auditoria
---
--- Instalacoes do CA SDM podem ter View_Audit_Group ou audit_log com o historico
--- de grupo em coluna propria. Quando existirem, entram como eventos adicionais.
--- Envolvido em OBJECT_ID + sp_executesql para o script continuar valido quando
--- os objetos nao existirem (evita erro de compilacao do batch).
---------------------------------------------------------------------------------
-IF OBJECT_ID(N'dbo.View_Audit_Group', N'V') IS NOT NULL
-BEGIN
-    EXEC sp_executesql N'
-        INSERT INTO #COIPBI_GrupoEventos (id, evento_epoch, grupo_origem, grupo_destino)
-        SELECT
-            b.id,
-            TRY_CONVERT(int, vag.from_time),
-            CONVERT(nvarchar(200), NULL),
-            CONVERT(nvarchar(200), LEFT(LTRIM(RTRIM(CONVERT(nvarchar(4000), vag.to_val))), 200))
-        FROM #COIPBI_CR AS b
-        JOIN dbo.View_Audit_Group AS vag
-            ON CONVERT(nvarchar(100), vag.audobj_uniqueid) = CONVERT(nvarchar(100), b.persid)
-        WHERE TRY_CONVERT(int, vag.from_time) IS NOT NULL
-          AND (b.open_date  IS NULL OR TRY_CONVERT(int, vag.from_time) >= b.open_date)
-          AND (b.close_date IS NULL OR TRY_CONVERT(int, vag.from_time) <= b.close_date)
-          AND NULLIF(LTRIM(RTRIM(CONVERT(nvarchar(4000), vag.to_val))), N'''') IS NOT NULL;';
-END;
-
-IF OBJECT_ID(N'dbo.audit_log', N'U') IS NOT NULL
-BEGIN
-    EXEC sp_executesql N'
-        INSERT INTO #COIPBI_GrupoEventos (id, evento_epoch, grupo_origem, grupo_destino)
-        SELECT
-            b.id,
-            TRY_CONVERT(int, au.change_date),
-            CONVERT(nvarchar(200), LEFT(LTRIM(RTRIM(CONVERT(nvarchar(4000), au.attr_before_val))), 200)),
-            CONVERT(nvarchar(200), LEFT(LTRIM(RTRIM(CONVERT(nvarchar(4000), au.attr_after_val))),  200))
-        FROM #COIPBI_CR AS b
-        JOIN dbo.audit_log AS au
-            ON CONVERT(nvarchar(100), au.audobj_persid) = CONVERT(nvarchar(100), b.persid)
-        WHERE TRY_CONVERT(int, au.change_date) IS NOT NULL
-          AND (b.open_date  IS NULL OR TRY_CONVERT(int, au.change_date) >= b.open_date)
-          AND (b.close_date IS NULL OR TRY_CONVERT(int, au.change_date) <= b.close_date)
-          AND CONVERT(nvarchar(4000), ISNULL(au.attr_name, N'''')) COLLATE Latin1_General_CI_AI LIKE N''%group%'';';
-END;
-
-CREATE INDEX IX_COIPBI_GrupoEventos_id_epoch ON #COIPBI_GrupoEventos(id, evento_epoch);
-
-
---------------------------------------------------------------------------------
--- [4] Fatos por chamado - UMA linha por chamado
---
---   grupo_inicial : origem da PRIMEIRA transferencia de grupo. Sem historico,
---                   o grupo inicial e o proprio grupo atual (nada mudou).
---   grupo_final   : destino da ULTIMA transferencia ate close_date. Sem
---                   historico, e o grupo atual.
---   passou_coi    : abriu no COI, entrou no COI, saiu do COI ou esta no COI.
---   encerrado_coi : grupo vigente no fechamento e COI.
---
--- O grupo atual (call_req.group_id) NAO e usado como prova de participacao
--- historica; ele so decide quando nao existe nenhum evento de grupo, caso em que
--- ele e, de fato, o unico grupo que o chamado teve.
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_Fatos') IS NOT NULL DROP TABLE #COIPBI_Fatos;
-
-SELECT
-    b.id,
-    b.[type],
-    b.open_date,
-    b.close_date,
-    b.abertura_br,
-    b.fechamento_br,
-    CONVERT(bit, CASE WHEN gc.group_uuid IS NOT NULL THEN 1 ELSE 0 END) AS grupo_atual_coi,
-    CONVERT(bit, CASE WHEN ev.qtd_eventos > 0 THEN 1 ELSE 0 END)        AS tem_historico,
-    ab.aberto_coi,
-    CONVERT(bit, CASE
-        WHEN ab.aberto_coi = 1 THEN 1                          -- foi ABERTO no COI
-        WHEN gc.group_uuid IS NOT NULL THEN 1                  -- esta no COI agora
-        WHEN ev.entrou_coi = 1 THEN 1                          -- foi transferido PARA o COI
-        WHEN ev.saiu_coi   = 1 THEN 1                          -- estava no COI e saiu
-        ELSE 0
-    END) AS passou_coi,
-    CONVERT(bit, CASE
-        WHEN b.close_date IS NULL THEN 0
-        WHEN fim.grupo_destino IS NOT NULL
-             AND EXISTS (SELECT 1 FROM #COIPBI_Nomes n WHERE n.grupo_nome = fim.grupo_destino COLLATE Latin1_General_CI_AI) THEN 1
-        WHEN fim.grupo_destino IS NULL AND gc.group_uuid IS NOT NULL THEN 1
-        ELSE 0
-    END) AS encerrado_coi
-INTO #COIPBI_Fatos
-FROM #COIPBI_CR AS b
-LEFT JOIN #COIPBI_Grupos AS gc
-    ON gc.group_uuid = b.group_id
-OUTER APPLY (
-    -- O casamento com #COIPBI_Nomes e feito por LEFT JOIN, ANTES da agregacao.
-    -- Nao usar MAX(CASE WHEN EXISTS (...)): o SQL Server rejeita agregacao sobre
-    -- expressao que contenha subconsulta (Msg 130), ainda que o parser aceite.
-    --
-    -- Os dois LEFT JOIN nao multiplicam linhas: #COIPBI_Nomes tem indice UNICO
-    -- em grupo_nome, entao cada evento casa com no maximo um nome de cada lado e
-    -- COUNT(*) continua sendo a contagem real de eventos de grupo do chamado.
-    SELECT
-        qtd_eventos = COUNT(*),
-        entrou_coi  = MAX(CASE WHEN ndes.grupo_nome IS NOT NULL THEN 1 ELSE 0 END),
-        saiu_coi    = MAX(CASE WHEN nori.grupo_nome IS NOT NULL THEN 1 ELSE 0 END)
-    FROM #COIPBI_GrupoEventos AS g
-    LEFT JOIN #COIPBI_Nomes AS ndes
-        ON ndes.grupo_nome = g.grupo_destino COLLATE Latin1_General_CI_AI
-    LEFT JOIN #COIPBI_Nomes AS nori
-        ON nori.grupo_nome = g.grupo_origem  COLLATE Latin1_General_CI_AI
-    WHERE g.id = b.id
-) AS ev
-OUTER APPLY (
-    SELECT TOP (1) g.grupo_origem
-    FROM #COIPBI_GrupoEventos AS g
-    WHERE g.id = b.id
-      AND g.grupo_origem IS NOT NULL
-    ORDER BY g.evento_epoch ASC
-) AS ini
-OUTER APPLY (
-    SELECT TOP (1) g.grupo_destino
-    FROM #COIPBI_GrupoEventos AS g
-    WHERE g.id = b.id
-      AND g.grupo_destino IS NOT NULL
-      AND (b.close_date IS NULL OR g.evento_epoch <= b.close_date)
-    ORDER BY g.evento_epoch DESC
-) AS fim
-CROSS APPLY (
-    -- "Aberto pelo COI": a origem da PRIMEIRA transferencia de grupo e o grupo em
-    -- que o chamado nasceu. Sem nenhuma transferencia, o grupo atual e o unico
-    -- grupo que o chamado teve - e portanto tambem o de abertura.
-    SELECT aberto_coi = CONVERT(bit, CASE
-        WHEN ISNULL(ev.qtd_eventos, 0) > 0
-             AND EXISTS (SELECT 1 FROM #COIPBI_Nomes n WHERE n.grupo_nome = ini.grupo_origem COLLATE Latin1_General_CI_AI) THEN 1
-        WHEN ISNULL(ev.qtd_eventos, 0) = 0 AND gc.group_uuid IS NOT NULL THEN 1
-        ELSE 0
-    END)
-) AS ab;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Fatos_id ON #COIPBI_Fatos(id);
-
-
---------------------------------------------------------------------------------
--- [4b] REGISTRADOS - a regra canonica, embutida VERBATIM.
---
---   O bloco abaixo e o MESMO texto dos sete SQLs oficiais de Registrados, byte
---   a byte, entre os marcadores INICIO/FIM REGRA CANONICA DE REGISTRADOS COI.
---   Confira com SHA256 do trecho entre os marcadores: ele tem de bater com o
---   dos sete arquivos em coi/queries/. Nao basta parecer igual.
---
---   Por que VERBATIM e nao reescrito com prefixo #COIPBI_: reescrever criaria
---   uma terceira implementacao da mesma regra, que divergiria na primeira
---   manutencao que alguem esquecesse de replicar. O preco e que as temporarias
---   do bloco (#RegCand, #RegEv, #Registrados, ...) nao carregam o prefixo
---   #COIPBI_. Isso nao colide com nada: cada tabela do bloco comeca com
---   IF OBJECT_ID(...) DROP TABLE, e o Power BI executa numa conexao propria.
---
---   Os DECLARE abaixo sao a unica adaptacao: apelidam os parametros @COIPBI_*
---   para os nomes que o bloco espera. Nenhuma linha do bloco foi tocada.
---------------------------------------------------------------------------------
-DECLARE @HorasBrasilParaUTC int          = @COIPBI_HorasBrasilParaUTC;
-DECLARE @Epoch              datetime2(0) = @COIPBI_Epoch;
-DECLARE @InicioBR           datetime2(0) = @COIPBI_InicioBR;
-DECLARE @FimBR              datetime2(0) = @COIPBI_FimBR;
-DECLARE @InicioEpoch        int          = @COIPBI_InicioEpoch;
-DECLARE @FimEpoch           int          = @COIPBI_FimEpoch;
-
-
 -- INICIO REGRA CANONICA DE REGISTRADOS COI
 --
 -- Bloco IDENTICO, byte a byte, nas SETE consultas de Registrados:
@@ -1615,189 +1266,74 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 
 --------------------------------------------------------------------------------
 -- FIM REGRA CANONICA DE REGISTRADOS COI
-
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- [5] Conjuntos finais - uma linha por chamado, sem repeticao
+-- RESULTADO - composicao da populacao por evidencia
 --
--- REGISTRADOS: projecao de #Registrados, que o bloco canonico ja entregou com
---   UMA linha por SDM e ja recortado pela janela sobre DataRegistroCOI.
---
---   O EIXO TEMPORAL MUDOU: era open_date, agora e registro_br - o instante da
---   PRIMEIRA entrada do chamado no universo logico COI. Um chamado aberto em
---   janeiro fora do COI e transferido em marco aparece em MARCO, e um chamado
---   que reentrou no COI nao aparece de novo. Os tres graficos passam a
---   descrever quando o COI recebeu o chamado, nao quando ele nasceu.
---
---   A regra anterior era 'passou_coi = 1 AND open_date na janela', que contava
---   tambem quem apenas SAIU do COI e datava tudo pela abertura. Ela foi
---   substituida, nao ajustada.
---
--- ENCERRADOS: inalterado - continua vindo de #COIPBI_Fatos.
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_Registrados') IS NOT NULL DROP TABLE #COIPBI_Registrados;
-
-SELECT
-    r.id,
-    r.tipo AS [type],
-    r.registro_br
-INTO #COIPBI_Registrados
-FROM #Registrados AS r;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Registrados_id ON #COIPBI_Registrados(id);
-
-IF OBJECT_ID('tempdb..#COIPBI_Encerrados') IS NOT NULL DROP TABLE #COIPBI_Encerrados;
-
-SELECT
-    f.id,
-    f.fechamento_br
-INTO #COIPBI_Encerrados
-FROM #COIPBI_Fatos AS f
-WHERE f.encerrado_coi = 1
-  AND f.close_date >= @COIPBI_InicioEpoch
-  AND f.close_date <  @COIPBI_FimEpoch;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Encerrados_id ON #COIPBI_Encerrados(id);
-
-
---------------------------------------------------------------------------------
--- [6] Calendarios da janela
---
--- Garantem que todos os dias, meses e horas da janela aparecam, inclusive os de
--- quantidade zero, para o eixo do grafico nao ficar com buracos.
---
--- MesAno sai como AAAA-MM: DATENAME/FORMAT dependem do idioma da sessao e
--- produziriam rotulo diferente conforme o servidor. AAAA-MM e estavel e ordena
--- corretamente como texto.
---------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#COIPBI_Dias') IS NOT NULL DROP TABLE #COIPBI_Dias;
-
-SELECT TOP (DATEDIFF(DAY, @COIPBI_InicioBR, @COIPBI_FimBR))
-    CONVERT(date, DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, @COIPBI_InicioBR)) AS dia
-INTO #COIPBI_Dias
-FROM sys.all_objects AS a
-CROSS JOIN sys.all_objects AS b;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Dias ON #COIPBI_Dias(dia);
-
-IF OBJECT_ID('tempdb..#COIPBI_Meses') IS NOT NULL DROP TABLE #COIPBI_Meses;
-
-SELECT DISTINCT
-    YEAR(d.dia)  AS Ano,
-    MONTH(d.dia) AS Mes,
-    CONVERT(char(7), CONCAT(YEAR(d.dia), N'-', RIGHT(CONCAT(N'0', MONTH(d.dia)), 2))) AS MesAno
-INTO #COIPBI_Meses
-FROM #COIPBI_Dias AS d;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Meses ON #COIPBI_Meses(Ano, Mes);
-
-IF OBJECT_ID('tempdb..#COIPBI_Horas') IS NOT NULL DROP TABLE #COIPBI_Horas;
-
-SELECT TOP (24)
-    CONVERT(int, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1) AS Hora
-INTO #COIPBI_Horas
-FROM sys.all_objects AS a;
-
-CREATE UNIQUE CLUSTERED INDEX IX_COIPBI_Horas ON #COIPBI_Horas(Hora);
-
-
---------------------------------------------------------------------------------
--- RESULTADO UNICO PARA O POWER BI
---
--- Os tres conjuntos logicos do COI empilhados por UNION ALL, discriminados por
--- [TipoResultado]. As colunas que nao se aplicam a um tipo de linha vem NULL,
--- com o tipo declarado explicitamente para o UNION nao inferir errado.
---
---   MENSAL  -> Ano, Mes, MesAno, Incidentes, Solicitacoes, Total
---   DIARIO  -> Dia, Registrados, Encerrados
---   HORARIO -> Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados
---
--- Ano/Mes/MesAno tambem sao preenchidos nas linhas DIARIO. Eles sao derivados
--- do proprio Dia, nao mudam nenhuma contagem, e permitem filtrar o grafico
--- diario por mes no Power BI sem precisar de coluna calculada.
+-- Duas secoes: o que ENTRA no indicador e, abaixo, o que ficou de FORA com
+-- ressalva. A segunda existe para que a exclusao seja um numero conferivel.
 --------------------------------------------------------------------------------
 SELECT
-    CONVERT(varchar(10), 'MENSAL')       AS TipoResultado,
-    m.Ano                                AS Ano,
-    m.Mes                                AS Mes,
-    m.MesAno                             AS MesAno,
-    CONVERT(date, NULL)                  AS Dia,
-    CONVERT(int,  NULL)                  AS Hora,
-    CONVERT(char(3), NULL)               AS HoraLabel,
-    CONVERT(int, ISNULL(agg.Incidentes,   0)) AS Incidentes,
-    CONVERT(int, ISNULL(agg.Solicitacoes, 0)) AS Solicitacoes,
-    CONVERT(int, ISNULL(agg.Total,        0)) AS Total,
-    CONVERT(int, NULL)                   AS Registrados,
-    CONVERT(int, NULL)                   AS Encerrados,
-    CONVERT(int, NULL)                   AS QtdRegistrados
-FROM #COIPBI_Meses AS m
-OUTER APPLY (
+    z.Secao,
+    z.EvidenciaRegistroCOI,
+    z.AliasEvidencia,
+    z.ForcaDaEvidencia,
+    SUM(z.I)   AS Incidentes,
+    SUM(z.R)   AS Solicitacoes,
+    COUNT(*)   AS Total
+FROM (
     SELECT
-        SUM(CASE WHEN r.[type] = 'I' THEN 1 ELSE 0 END) AS Incidentes,
-        SUM(CASE WHEN r.[type] = 'R' THEN 1 ELSE 0 END) AS Solicitacoes,
-        COUNT(*)                                        AS Total
-    FROM #COIPBI_Registrados AS r
-    WHERE YEAR(r.registro_br)  = m.Ano
-      AND MONTH(r.registro_br) = m.Mes
-) AS agg
-
-UNION ALL
-
-SELECT
-    CONVERT(varchar(10), 'DIARIO')       AS TipoResultado,
-    YEAR(d.dia)                          AS Ano,
-    MONTH(d.dia)                         AS Mes,
-    CONVERT(char(7), CONCAT(YEAR(d.dia), N'-', RIGHT(CONCAT(N'0', MONTH(d.dia)), 2))) AS MesAno,
-    d.dia                                AS Dia,
-    CONVERT(int,  NULL)                  AS Hora,
-    CONVERT(char(3), NULL)               AS HoraLabel,
-    CONVERT(int, NULL)                   AS Incidentes,
-    CONVERT(int, NULL)                   AS Solicitacoes,
-    CONVERT(int, NULL)                   AS Total,
-    CONVERT(int, ISNULL(reg.Qtd, 0))     AS Registrados,
-    CONVERT(int, ISNULL(enc.Qtd, 0))     AS Encerrados,
-    CONVERT(int, NULL)                   AS QtdRegistrados
-FROM #COIPBI_Dias AS d
-OUTER APPLY (
-    SELECT COUNT(*) AS Qtd
-    FROM #COIPBI_Registrados AS r
-    WHERE CONVERT(date, r.registro_br) = d.dia
-) AS reg
-OUTER APPLY (
-    SELECT COUNT(*) AS Qtd
-    FROM #COIPBI_Encerrados AS e
-    WHERE CONVERT(date, e.fechamento_br) = d.dia
-) AS enc
-
-UNION ALL
-
-SELECT
-    CONVERT(varchar(10), 'HORARIO')      AS TipoResultado,
-    m.Ano                                AS Ano,
-    m.Mes                                AS Mes,
-    m.MesAno                             AS MesAno,
-    CONVERT(date, NULL)                  AS Dia,
-    h.Hora                               AS Hora,
-    CONVERT(char(3), CONCAT(RIGHT(CONCAT(N'0', h.Hora), 2), N'h')) AS HoraLabel,
-    CONVERT(int, NULL)                   AS Incidentes,
-    CONVERT(int, NULL)                   AS Solicitacoes,
-    CONVERT(int, NULL)                   AS Total,
-    CONVERT(int, NULL)                   AS Registrados,
-    CONVERT(int, NULL)                   AS Encerrados,
-    CONVERT(int, ISNULL(agg.Qtd, 0))     AS QtdRegistrados
-FROM #COIPBI_Meses AS m
-CROSS JOIN #COIPBI_Horas AS h
-OUTER APPLY (
-    SELECT COUNT(*) AS Qtd
-    FROM #COIPBI_Registrados AS r
-    WHERE YEAR(r.registro_br)           = m.Ano
-      AND MONTH(r.registro_br)          = m.Mes
-      AND DATEPART(HOUR, r.registro_br) = h.Hora
-) AS agg
-
-ORDER BY
-    TipoResultado,
-    Ano,
-    Mes,
-    Dia,
-    Hora;
+        CONVERT(varchar(18), '1-NO INDICADOR') COLLATE DATABASE_DEFAULT AS Secao,
+        r.evidencia_coi AS EvidenciaRegistroCOI,
+        CONVERT(nvarchar(200), ISNULL(r.alias_evidencia, N'-')) AS AliasEvidencia,
+        CONVERT(nvarchar(72), CASE r.evidencia_coi
+            WHEN 'ABERTO_NO_COI_CADEIA'
+                THEN N'CADEIA: origem do 1o evento de grupo ja e COI'
+            WHEN 'JA_ESTAVA_NO_COI_HISTORICO'
+                THEN N'CADEIA: origem e o nome posterior da fila COI antiga'
+            WHEN 'TRANSFERIDO_PARA_COI'
+                THEN N'CADEIA: nasceu fora, 1a transferencia da vida com destino COI'
+            WHEN 'ENTRADA_DEMONSTRAVEL_DESTINO'
+                THEN N'CADEIA: origem nao prova a 1a entrada, destino prova'
+            WHEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL'
+                THEN N'FALLBACK: sem evento de grupo, permaneceu no COI'
+            WHEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO'
+                THEN N'FALLBACK: sem evento, UUID antigo, aberto antes da transicao'
+            WHEN 'AUTOMACAO_TASK_SCHEDULER'
+                THEN N'AUTOMACAO: registro oficial do COI direto na fila destino'
+            ELSE N'(categoria inesperada - investigar)' END) AS ForcaDaEvidencia,
+        CASE WHEN r.tipo = 'I' THEN 1 ELSE 0 END AS I,
+        CASE WHEN r.tipo = 'R' THEN 1 ELSE 0 END AS R
+    FROM #Registrados AS r
+    UNION ALL
+    SELECT
+        CONVERT(varchar(18), '2-RESSALVA') COLLATE DATABASE_DEFAULT,
+        s.evidencia_coi,
+        CONVERT(nvarchar(200), N'-'),
+        CONVERT(nvarchar(72), CASE s.evidencia_coi
+            WHEN 'SEM_RECONSTRUCAO_EVENTO_ILEGIVEL'
+                THEN N'FORA: houve evento de grupo, nenhum legivel'
+            WHEN 'AMBIGUO_JANELA_TRANSICAO'
+                THEN N'FORA: aberto na janela e SEM entrada demonstravel em fila COI'
+            WHEN 'CONTRADICAO_INIT_x_CADEIA'
+                THEN N'FORA: INIT nomeia fila nao-COI e contradiz a origem historica'
+            WHEN 'INIT_CONTRATO_INCOMPATIVEL_COM_DATA_ABERTURA'
+                THEN N'FORA: INIT traz nome que a fila so recebeu depois da abertura'
+            ELSE N'(categoria inesperada - investigar)' END),
+        CASE WHEN s.tipo = 'I' THEN 1 ELSE 0 END,
+        CASE WHEN s.tipo = 'R' THEN 1 ELSE 0 END
+    FROM #RegRessalvas AS s
+) AS z
+GROUP BY z.Secao, z.EvidenciaRegistroCOI, z.AliasEvidencia, z.ForcaDaEvidencia
+ORDER BY z.Secao,
+    CASE z.EvidenciaRegistroCOI
+        WHEN 'ABERTO_NO_COI_CADEIA'                        THEN 1
+        WHEN 'JA_ESTAVA_NO_COI_HISTORICO'                  THEN 2
+        WHEN 'TRANSFERIDO_PARA_COI'                        THEN 3
+        WHEN 'ENTRADA_DEMONSTRAVEL_DESTINO'                THEN 4
+        WHEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL'          THEN 5
+        WHEN 'ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL_HISTORICO' THEN 6
+        WHEN 'AUTOMACAO_TASK_SCHEDULER'                    THEN 7
+        ELSE 8 END,
+    Total DESC;
