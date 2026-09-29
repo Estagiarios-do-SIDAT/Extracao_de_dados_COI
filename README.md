@@ -24,7 +24,11 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 │   ├── consulta_coi_registrados_universo_bruto.sql
 │   └── consulta_coi_registrados_validacao.sql
 ├── powerbi/
-│   └── consulta_coi_volumetria_power_bi.sql
+│   └── <consulta de queries/>_power_bi.sql   12 arquivos, um por consulta
+├── docs/
+│   ├── coi-calculation.md                 regras de cálculo, a partir de queries/
+│   ├── powerbi-query.md                   documentação das consultas do Power BI
+│   └── documentacao-powerbi-coi.html      versão resumida para o Power BI
 ├── project-context/
 │   └── COI-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
 ├── support/
@@ -48,7 +52,7 @@ A regra de negócio é construída a partir do histórico de fila, do tipo de ch
 
 O bloco de consultas de registrados responde à pergunta: **quais chamados efetivamente entraram na base do COI no período**.
 
-Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As sete consultas e a do painel compartilham um **bloco canônico** idêntico, conferido por SHA256; a regra completa, a precedência e o hash vigente estão no Histórico Mestre.
+Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As sete consultas e as suas sete versões do Power BI compartilham um **bloco canônico** idêntico, conferido por SHA256. A regra está descrita em [`docs/coi-calculation.md`](docs/coi-calculation.md); a precedência e o hash vigente estão no Histórico Mestre.
 
 **Indicadores** — o que alimenta gráfico e painel:
 
@@ -82,7 +86,9 @@ O período é parametrizável, com intervalo semiaberto (`>= início` e `< fim`)
 
 ### Painel
 
-Para o painel existe [`powerbi/consulta_coi_volumetria_power_bi.sql`](powerbi/consulta_coi_volumetria_power_bi.sql), que entrega os indicadores em um único result set discriminado pela coluna `TipoResultado`.
+A pasta `powerbi/` tem uma versão para cada uma das 12 consultas de `queries/`, com o mesmo nome acrescido de `_power_bi`. Cada uma aplica a mesma regra da sua referência, com período automático e saída num único resultado.
+
+A documentação das consultas do Power BI está em [`docs/powerbi-query.md`](docs/powerbi-query.md). Uma versão resumida, para o visual HTML Content do Power BI, está em [`docs/documentacao-powerbi-coi.html`](docs/documentacao-powerbi-coi.html).
 
 ## Consultas de apoio
 
@@ -116,7 +122,7 @@ Os nomes variam por família de consulta:
 | Registrados (`consulta_coi_registrados_*.sql`) | `@InicioBR` | `@FimBR` | — |
 | Encerrados | `@DataInicio` | `@DataFim` | `@MostrarDiagnostico` |
 | Pesquisa de satisfação dos encerrados | `@DataInicio` | `@DataFim` | `@MostrarConferencia` |
-| Painel (`consulta_coi_volumetria_power_bi.sql`) | automático | automático | — |
+| Power BI (`powerbi/*_power_bi.sql`) | automático, por `@PBI_QuantidadeMeses`; fixo em membros, contas técnicas e universo bruto | automático; fixo nas mesmas três | as da referência |
 
 - Todas as datas são horário do Brasil (GMT-3) e o intervalo é **semiaberto**: `>= início` e `< fim`. Para março inteiro, use início `2026-03-01 00:00:00` e fim `2026-04-01 00:00:00` — nunca `23:59:59`.
 - `@TransIniBR` e `@TransFimBR`, dentro do bloco canônico, marcam a janela da renomeação das filas do COI em 18/03/2026. **Não são parâmetros de período** e não devem ser alterados.

@@ -220,11 +220,13 @@ consulta de validação conta esses casos.
 
 ### O registro de criação é auxiliar
 
-O evento de criação (`INIT`) traz a marca `%GROUP=`, com o grupo pedido na
-abertura. Ela **não decide** a data: o grupo pedido nem sempre é o grupo em que o
-chamado efetivamente nasceu, e a cadeia real prevalece. A marca serve para:
+O evento de criação (`INIT`) traz a marca `%GROUP=`, com o valor que o programa
+de criação informou. Ela **não decide** a data: o valor informado nem sempre é o
+grupo em que o chamado efetivamente nasceu, e a cadeia real prevalece. A marca
+serve para:
 
-- auditoria — as colunas `GrupoInit` e `InitConsistenteComReconstrucao`;
+- auditoria — as colunas `GrupoInit` e `InitConsistenteComReconstrucao` (ver
+  [seção 10](#grupoinit-primeiraorigemgrupo-e-primeirodestinogrupo));
 - trava — impede a leitura histórica quando contradiz a origem (as duas
   ressalvas de `INIT` da seção anterior);
 - um dos três termos da automação Task Scheduler.
@@ -486,6 +488,56 @@ As colunas de quem abriu, do grupo atual e da cadeia são **informativas**:
 nenhuma delas altera a população, a data ou a evidência. Um chamado cujo
 registrador não existe no cadastro continua na lista, com o UUID preenchido e o
 nome marcado como não resolvido.
+
+### `GrupoInit`, `PrimeiraOrigemGrupo` e `PrimeiroDestinoGrupo`
+
+As três colunas têm finalidades diferentes e **não precisam coincidir**:
+
+| Coluna | O que representa | De onde vem | Sem valor |
+|---|---|---|---|
+| `GrupoInit` | O valor informado em `%GROUP=` no evento de criação do chamado. É informação auxiliar e pode não coincidir com o grupo em que o chamado nasceu | Evento `INIT`; havendo mais de um, o mais antigo | `(sem %GROUP= no INIT)` |
+| `PrimeiraOrigemGrupo` | O grupo de origem da primeira transferência de grupo legível do histórico. Quando há transferência, é a principal evidência de onde o chamado estava antes do primeiro movimento | Primeiro evento `TR` de grupo legível | `(origem não legível)` |
+| `PrimeiroDestinoGrupo` | O grupo de destino dessa mesma primeira transferência: a fila seguinte ao primeiro movimento, que não precisa ser o COI | O mesmo evento | `(sem evento de grupo)` |
+
+As três saem normalizadas: em maiúsculas, com espaços repetidos reduzidos a um.
+Em `GrupoInit`, quebras de linha e tabulações também viram espaço. Os acentos são
+mantidos.
+
+Quando o chamado **não tem nenhuma transferência de grupo** (`QtdEventosGrupo` = 0),
+`PrimeiraOrigemGrupo` mostra `(origem não legível)` e `PrimeiroDestinoGrupo` mostra
+`(sem evento de grupo)`. Nesse caso, a regra usa o grupo atual (seção
+[4](#4-dataregistrocoi)).
+
+**`GrupoInit` diferente de `PrimeiraOrigemGrupo` não é erro.** Significa que o
+programa de criação informou um valor e o chamado nasceu em outro grupo. A coluna
+`InitConsistenteComReconstrucao` mostra se o registro de criação e a evidência
+usada concordam sobre o chamado ter nascido ou não no COI: `sim` quando
+concordam, `NAO - cadeia contradiz o INIT` quando não.
+
+Nenhuma das três decide, sozinha, a entrada no indicador. A classificação usa a
+cadeia real de transferências e as demais regras das seções [3](#3-chamados-registrados)
+a [5](#5-automações). O `%GROUP=` só participa da decisão no critério da automação
+Task Scheduler.
+
+**Exemplo — SDM 1658863.**
+
+| Momento | Evento |
+|---|---|
+| 20/11/2025 09:00:01 | Criação via CMD por `servicedesk`, com `%GROUP=Virtual TI.Elaborar/Manter Documentação` |
+| 20/11/2025 09:11:09 | `Transferir Grupo de 'COI' para 'Fornecedores - Virtual'` |
+
+| Coluna | Valor |
+|---|---|
+| `GrupoInit` | `VIRTUAL TI.ELABORAR/MANTER DOCUMENTAÇÃO` |
+| `PrimeiraOrigemGrupo` | `COI` |
+| `PrimeiroDestinoGrupo` | `FORNECEDORES - VIRTUAL` |
+| `InitConsistenteComReconstrucao` | `NAO - cadeia contradiz o INIT` |
+| `EvidenciaRegistroCOI` | `ABERTO_NO_COI_CADEIA` |
+| `DataRegistroCOI` | 20/11/2025 09:00:01 (a abertura) |
+
+O valor de `%GROUP=` desse chamado é o nome de uma categoria, não de uma fila. A
+primeira transferência mostra que ele nasceu no COI, e é essa cadeia que o
+registra no indicador: evidência `ABERTO_NO_COI_CADEIA`, datado na abertura.
 
 ---
 
