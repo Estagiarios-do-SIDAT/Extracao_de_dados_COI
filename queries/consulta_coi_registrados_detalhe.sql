@@ -10,7 +10,7 @@ Prova de auditoria da base de Registrados: lista NOMINALMENTE os chamados que
 compoem o total do indicador, com quem registrou e POR QUE cada um entrou.
 
 Saida: UM unico result set, UMA linha por SDM.
-    SDM, DataHoraRegistro, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
+    SDM, Categoria, Resumo, DataHoraRegistro, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
     RegistradorUUID, RegistradorUserID, RegistradorNome,
     GrupoAtualUUID, EvidenciaCOI, AliasEvidencia, DataPrimeiraEntradaCOI
 
@@ -91,8 +91,8 @@ DECLARE @HorasBrasilParaUTC int = 3;
 DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
 
 -- Periodo analisado. Altere apenas estas duas linhas.
-DECLARE @InicioBR datetime2(0) = '2026-06-01 00:00:00';   -- inclusivo
-DECLARE @FimBR    datetime2(0) = '2026-07-01 00:00:00';   -- EXCLUSIVO
+DECLARE @InicioBR datetime2(0) = '2026-10-01 00:00:00';   -- inclusivo
+DECLARE @FimBR    datetime2(0) = '2026-11-01 00:00:00';   -- EXCLUSIVO
 
 DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
 DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
@@ -1208,6 +1208,19 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 -- le #Registrados como o bloco canonico entregou. Nenhuma coluna aqui pode
 -- alterar populacao, DataRegistroCOI ou evidencia.
 --
+-- CATEGORIA E RESUMO (colunas informativas, logo apos SDM)
+--
+--   Categoria e Resumo seguem a mesma definicao do FAIA/FARC da Decision
+--   (decision/queries/consulta_faia_farc.sql):
+--     Categoria = prob_ctg.sym, ligada por call_req.category = prob_ctg.persid;
+--                 sem categoria resolvida, 'N/A'.
+--     Resumo    = call_req.summary convertido para nvarchar(4000), sem espacos
+--                 nas pontas.
+--   Sao lidas aqui, na projecao, por dois LEFT JOIN de chave unica (call_req.id
+--   e prob_ctg.persid). Nao entram em predicado nem na classificacao, e nao
+--   multiplicam nem removem linha: a populacao e a do bloco canonico, intacta.
+--   O bloco canonico de Registrados, acima, NAO foi alterado.
+--
 -- AS DUAS COLUNAS DE EVIDENCIA, e por que sao duas
 --
 --   FormaRegistroCOI      texto de negocio, para ler e filtrar no Excel/Power BI
@@ -1247,6 +1260,8 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 SELECT
     -- IDENTIFICACAO E EIXO
     r.SDM,
+    ISNULL(pc.sym, N'N/A')                          AS [Categoria],
+    LTRIM(RTRIM(CONVERT(nvarchar(4000), cr.summary))) AS [Resumo],
     r.abertura_br                                   AS DataAbertura,
     r.registro_br                                   AS DataRegistroCOI,
 
@@ -1322,6 +1337,11 @@ SELECT
 FROM #Registrados AS r
 LEFT JOIN dbo.ca_contact AS reg
     ON reg.contact_uuid = r.log_agent
+-- Categoria e Resumo: so leitura, chave unica (id e persid), sem filtro.
+LEFT JOIN dbo.call_req AS cr
+    ON cr.id = r.id
+LEFT JOIN dbo.prob_ctg AS pc
+    ON pc.persid = cr.category
 ORDER BY
     r.registro_br,
     r.SDM;
