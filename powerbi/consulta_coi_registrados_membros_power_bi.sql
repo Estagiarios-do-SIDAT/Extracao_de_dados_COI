@@ -308,7 +308,9 @@ CREATE TABLE #PBI_Saida (
     [Observacao]           nvarchar(32) NULL,
     [SDM]                  nvarchar(30) NULL,
     [DataAbertura]         datetime2(0) NULL,
-    [NomeAnalista]         nvarchar(120) NULL
+    [NomeAnalista]         nvarchar(120) NULL,
+    [Categoria]                   nvarchar(200) NULL,
+    [Resumo]                      nvarchar(4000) NULL
 );
 
 --------------------------------------------------------------------------------
@@ -379,7 +381,7 @@ ORDER BY p.ord, ISNULL(q.t, 0) DESC, r.nome;
 -- RS 3 - DETALHE, uma linha por SDM antes de qualquer agregacao
 --------------------------------------------------------------------------------
 -- [POWER BI] grava este result set em #PBI_Saida.
-INSERT INTO #PBI_Saida (TipoResultado, [Periodo], [Ano], [Mes], [SDM], [DataAbertura], [Tipo], [LogAgent], [NomeAnalista])
+INSERT INTO #PBI_Saida (TipoResultado, [Periodo], [Ano], [Mes], [SDM], [DataAbertura], [Tipo], [LogAgent], [NomeAnalista], [Categoria], [Resumo])
 SELECT
     'DETALHE',
     o.periodo AS Periodo,
@@ -389,10 +391,22 @@ SELECT
     o.abertura_br AS DataAbertura,
     CASE o.tipo WHEN 'I' THEN N'Incidente' ELSE N'Solicitação' END AS Tipo,
     ISNULL(NULLIF(cn.userid, N''), N'-') AS LogAgent,
-    o.nome_analista AS NomeAnalista
+    o.nome_analista AS NomeAnalista,
+    ISNULL(catx.sym, N'N/A') AS Categoria,
+    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
 FROM #Pop AS o
 JOIN #Per AS p ON p.periodo = o.periodo
 LEFT JOIN #ContNorm AS cn ON cn.contact_uuid = o.log_agent
+OUTER APPLY (
+    -- Categoria e Resumo do registro principal do chamado (call_req), so
+    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
+    SELECT TOP (1) cx.summary, cx.category
+    FROM dbo.call_req AS cx
+    WHERE cx.ref_num = o.sdm
+    ORDER BY cx.id
+) AS crx
+LEFT JOIN dbo.prob_ctg AS catx
+    ON catx.persid = crx.category
 ORDER BY p.ord, o.abertura_br, o.sdm;
 
 --------------------------------------------------------------------------------
@@ -419,6 +433,8 @@ SELECT
     [Observacao],
     [SDM],
     [DataAbertura],
-    [NomeAnalista]
+    [NomeAnalista],
+    [Categoria],
+    [Resumo]
 FROM #PBI_Saida
 ORDER BY PBI_Ordem;

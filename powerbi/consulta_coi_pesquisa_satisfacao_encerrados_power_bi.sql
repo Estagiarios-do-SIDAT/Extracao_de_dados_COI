@@ -410,7 +410,9 @@ CREATE TABLE #PBI_Saida (
     [LinhasNaJanela2]             int NULL,
     [SemRespostaNaPerguntaAvaliada] int NULL,
     [SDMsDistintos]               int NULL,
-    [SomaFechaComEncerrados]      nvarchar(16) NULL
+    [SomaFechaComEncerrados]      nvarchar(16) NULL,
+    [Categoria]                   nvarchar(200) NULL,
+    [Resumo]                      nvarchar(4000) NULL
 );
 
 --------------------------------------------------------------------------------
@@ -439,12 +441,24 @@ ORDER BY r.com_satisfacao DESC;
 --   SDM, com a opcao escolhida - nao comentario livre.
 --------------------------------------------------------------------------------
 -- [POWER BI] grava este result set em #PBI_Saida.
-INSERT INTO #PBI_Saida (TipoResultado, [SDM], [RespostaSatisfacao])
+INSERT INTO #PBI_Saida (TipoResultado, [SDM], [RespostaSatisfacao], [Categoria], [Resumo])
 SELECT
     'JANELA_2_DETALHE',
     r.SDM,
-    r.resposta_avaliada AS RespostaSatisfacao
+    r.resposta_avaliada AS RespostaSatisfacao,
+    ISNULL(catx.sym, N'N/A') AS Categoria,
+    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
 FROM #Resultado AS r
+OUTER APPLY (
+    -- Categoria e Resumo do registro principal do chamado (call_req), so
+    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
+    SELECT TOP (1) cx.summary, cx.category
+    FROM dbo.call_req AS cx
+    WHERE cx.ref_num = r.SDM
+    ORDER BY cx.id
+) AS crx
+LEFT JOIN dbo.prob_ctg AS catx
+    ON catx.persid = crx.category
 WHERE r.resposta_avaliada IS NOT NULL
 ORDER BY r.SDM;
 
@@ -515,6 +529,8 @@ SELECT
     [LinhasNaJanela2],
     [SemRespostaNaPerguntaAvaliada],
     [SDMsDistintos],
-    [SomaFechaComEncerrados]
+    [SomaFechaComEncerrados],
+    [Categoria],
+    [Resumo]
 FROM #PBI_Saida
 ORDER BY PBI_Ordem;

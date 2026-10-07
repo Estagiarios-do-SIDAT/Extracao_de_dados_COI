@@ -24,11 +24,11 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 │   ├── consulta_coi_registrados_universo_bruto.sql
 │   └── consulta_coi_registrados_validacao.sql
 ├── powerbi/
-│   └── <consulta de queries/>_power_bi.sql   12 arquivos, um por consulta
+│   ├── <consulta de queries/>_power_bi.sql   12 arquivos: a consulta do Power BI de cada relatório (uma por relatório)
+│   ├── powerbi-query.md                   documentação das consultas do Power BI
+│   └── documentacao-powerbi-coi.html      versão resumida para o Power BI
 ├── docs/
 │   ├── coi-calculation.md                 regras de cálculo, a partir de queries/
-│   ├── powerbi-query.md                   documentação das consultas do Power BI
-│   ├── documentacao-powerbi-coi.html      versão resumida para o Power BI
 │   └── feriados.txt                       calendário comum de feriados do TCU (cópia; não usado pelas consultas do COI)
 ├── project-context/
 │   └── COI-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
@@ -89,7 +89,7 @@ O período é parametrizável, com intervalo semiaberto (`>= início` e `< fim`)
 
 A pasta `powerbi/` tem uma versão para cada uma das 12 consultas de `queries/`, com o mesmo nome acrescido de `_power_bi`. Cada uma aplica a mesma regra da sua referência, com período automático e saída num único resultado.
 
-A documentação das consultas do Power BI está em [`docs/powerbi-query.md`](docs/powerbi-query.md). Uma versão resumida, para o visual HTML Content do Power BI, está em [`docs/documentacao-powerbi-coi.html`](docs/documentacao-powerbi-coi.html).
+A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). Uma versão resumida, para o visual HTML Content do Power BI, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
 
 ## Consultas de apoio
 

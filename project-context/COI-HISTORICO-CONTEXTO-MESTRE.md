@@ -24926,3 +24926,82 @@ Os 17 SQLs têm os **mesmos blobs** no Git antes e depois, e o bloco canônico c
 O README passou a citar os caminhos novos. As seções anteriores deste histórico citam os caminhos da época e não foram reescritas. A pasta antiga `Queries`, fora dos repositórios, foi excluída nesta data; `_arquivo-trabalho-coi/` foi mantida.
 
 Regra daqui para frente: trabalho do COI atualiza **somente** este arquivo.
+
+## 73. 2026-10-07 — consolidação: `Categoria` e `Resumo` no Power BI, documentação em `powerbi/`, calendário
+
+Nenhuma regra, população, contagem ou bloco canônico mudou. Só colunas
+informativas novas no fim das saídas e documentação reorganizada.
+
+**Colunas novas.** `Categoria` e `Resumo` vêm do registro principal do chamado
+(`call_req.summary`; `prob_ctg.sym` por `call_req.category`), com a mesma
+definição das consultas do Power BI dos outros núcleos (`ISNULL(sym, 'N/A')`,
+`LTRIM(RTRIM(ISNULL(summary, '')))`). Só onde faltavam e havia fonte:
+
+| Consulta (queries/ e powerbi/) | O que entrou |
+|---|---|
+| `encerrados` | `Categoria` (= `Símbolo`; `Símbolo` mantida para não quebrar quem lê por nome; `Resumo` já existia) |
+| `registrados_detalhe` | `Categoria`, `Resumo` |
+| `registrados_membros` | `Categoria`, `Resumo` no detalhe por SDM |
+| `registrados_total_com_tecnicos` | `Categoria`, `Resumo` no detalhe por SDM |
+| `registrados_universo_bruto` | `Categoria`, `Resumo` no detalhe por SDM |
+| `pesquisa_satisfacao_encerrados` | `Categoria`, `Resumo` no detalhe da janela 2 |
+
+As junções ficam no SELECT final, fora dos blocos compartilhados. Nas versões
+do Power BI, que empilham resumo e detalhe num resultado só, as linhas de
+resumo/conferência saem com as duas colunas vazias. As consultas agregadas
+(mensal, por hora, por registrador, por evidência, encerrados diário,
+validação) não têm linha por chamado e não mudaram.
+
+Blocos conferidos contra `7c643f9`: `REGRA CANONICA DE REGISTRADOS COI`
+`e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc` (14/14
+cópias iguais ao HEAD) e `REGRA COMPARTILHADA TECNICOS COI`
+`c1fb8ab920b6a5cadd2f35b8359889c9bcccc6eefbe8b8d7c48bd2147ab7d9ad` (4/4).
+
+**Documentação.** `docs/powerbi-query.md` e `docs/documentacao-powerbi-coi.html`
+foram para `powerbi/` (`git mv`); README e `docs/coi-calculation.md` citam os
+caminhos novos e as colunas novas.
+
+Calendário: `docs/feriados.txt` ficou com só três seções (`## Feriados
+Fixos`, `## Feriados móveis/diferenciados`, `## Pontos Facultativos`); saíram a
+seção `## Regras` (o texto virou introdução antes da primeira seção), a seção
+`## Feriados Por Data` (sem datas), o parágrafo das cópias e os blocos
+`Fontes:` de cada ano. Mesmas 35 datas: o JSON enviado ao SQL em `@Feriados` é
+idêntico, byte a byte, ao da rodada anterior; de 2025-01-01 a 2027-12-31, 53
+datas de feriado/ponto facultativo e 357 dias fora do Horário TCU antes e
+depois. O COI só guarda a cópia (`docs/feriados.txt`; nunca teve
+`feriados.md` nem consulta `.m`); o leitor `tools/feriados.ps1` e o Power Query
+ficam nos outros repositórios e aceitam só as três seções. Cinco cópias
+idênticas: `docs/feriados.txt` de Decision, A2B, COI e Virtual e
+`Documentos e Relatórios/feriados.txt` (SHA-256 `1a97965ec7e003f1addfbc13af0f497bf45cec05b66d05c9ce98323d1365592b`).
+
+**Regressão** contra `7c643f9` (antes x depois, mesmo instante), as 12
+consultas alteradas (6 de `queries/`, 6 de `powerbi/`), 21 result sets: mesmas
+linhas e 0 diferenças em todas as colunas que já existiam. Linhas: encerrados
+3.558 (Power BI) e 476 (referência); detalhe 21.385 e 3.483; membros 2.070 e
+1.988 SDMs; total com técnicos 3.835 e 3.823; universo bruto 9.078 e 8.968;
+pesquisa 5 e 0 (referência sem linha de detalhe na janela). `Categoria` e
+`Resumo` preenchidas em todas as linhas com SDM; vazias só nas linhas de
+resumo empilhadas; 12 chamados do universo bruto sem categoria no SDM saem com
+`Categoria = N/A`.
+
+Referência das Portarias do calendário (o `feriados.txt` não traz mais as
+fontes por bloco):
+
+| Ano | Portaria | Código de autenticidade (BTCU) | O que define |
+|---|---|---|---|
+| 2025 | Portaria-TCU nº 10, de 13/01/2025 | 77411949 | calendário de 2025 |
+| 2025 | Portaria-TCU nº 67, de 28/04/2025 | 77981373 | inclui 02/05/2025 |
+| 2025 | Portaria-TCU nº 157, de 30/10/2025 | 79190602 | inclui 21/11/2025 |
+| 2025 | Portaria-TCU nº 176, de 19/12/2025 | 79506777 | inclui 26/12/2025 |
+| 2026 | Portaria-TCU nº 179, de 19/12/2025 | 79506777 | define 02/01/2026 |
+| 2026 | Portaria-TCU nº 1, de 08/01/2026 | 79561193 | calendário de 2026 |
+| 2026 | Portaria-TCU nº 93, de 25/06/2026 | 80587034 | inclui 29/06/2026 (jogo da Seleção na Copa) |
+
+Consulta: `www.tcu.gov.br/autenticidade` (PDF em
+`https://btcu.apps.tcu.gov.br/api/obterDocumentoPdf/<código>`). Datas por
+seção: fixos 01-01, 21-04, 01-05, 07-09, 12-10, 02-11, 15-11, 20-11, 25-12;
+móveis 18-04-2025 e 03-04-2026 (Paixão de Cristo); pontos facultativos 2025:
+03-03, 04-03, 05-03, 17-04, 02-05, 19-06, 20-06, 27-10, 21-11, 24-12, 26-12,
+31-12; 2026: 02-01, 16-02, 17-02, 18-02, 02-04, 20-04, 04-06, 05-06, 29-06,
+28-10, 24-12, 31-12. Ao sair uma Portaria nova, registrar aqui número, data e
+código.
