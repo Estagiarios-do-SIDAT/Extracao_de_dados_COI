@@ -589,9 +589,7 @@ CREATE TABLE #PBI_Saida (
     [FonteEvidenciaOrigem]        nvarchar(16) NULL,
     [GrupoOrigem]                 nvarchar(200) NULL,
     [GrupoAtual_soReferencia]     nvarchar(120) NULL,
-    [AnalistaDoRoster]            nvarchar(120) NULL,
-    [Categoria]                   nvarchar(200) NULL,
-    [Resumo]                      nvarchar(4000) NULL
+    [AnalistaDoRoster]            nvarchar(120) NULL
 );
 
 --------------------------------------------------------------------------------
@@ -657,7 +655,7 @@ ORDER BY p.ord, o.ord;
 -- este cabecalho.
 --------------------------------------------------------------------------------
 -- [POWER BI] grava este result set em #PBI_Saida.
-INSERT INTO #PBI_Saida (TipoResultado, [Periodo], [SDM], [Tipo], [DataAbertura], [LogAgent], [NomeLogAgent], [OrigemPopulacao], [FonteEvidenciaOrigem], [GrupoOrigem], [GrupoAtual_soReferencia], [AnalistaDoRoster], [Categoria], [Resumo])
+INSERT INTO #PBI_Saida (TipoResultado, [Periodo], [SDM], [Tipo], [DataAbertura], [LogAgent], [NomeLogAgent], [OrigemPopulacao], [FonteEvidenciaOrigem], [GrupoOrigem], [GrupoAtual_soReferencia], [AnalistaDoRoster])
 SELECT
     'DETALHE',
     c.periodo AS Periodo,
@@ -672,23 +670,11 @@ SELECT
     c.fonte_evidencia AS FonteEvidenciaOrigem,
     c.grupo_origem AS GrupoOrigem,
     ISNULL(NULLIF(cg.nome_bruto, N''), N'(grupo nao resolvido)') AS GrupoAtual_soReferencia,
-    ISNULL(c.nome_roster, N'-') AS AnalistaDoRoster,
-    ISNULL(catx.sym, N'N/A') AS Categoria,
-    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
+    ISNULL(c.nome_roster, N'-') AS AnalistaDoRoster
 FROM #Cls AS c
 JOIN #Per AS p ON p.periodo = c.periodo
 LEFT JOIN #ContNorm AS cn ON cn.contact_uuid = c.log_agent
 LEFT JOIN #ContNorm AS cg ON cg.contact_uuid = c.group_id
-OUTER APPLY (
-    -- Categoria e Resumo do registro principal do chamado (call_req), so
-    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
-    SELECT TOP (1) cx.summary, cx.category
-    FROM dbo.call_req AS cx
-    WHERE cx.ref_num = c.sdm
-    ORDER BY cx.id
-) AS crx
-LEFT JOIN dbo.prob_ctg AS catx
-    ON catx.persid = crx.category
 WHERE c.no_total_coi = 1
 ORDER BY p.ord, c.abertura_br, c.sdm;
 
@@ -715,8 +701,6 @@ SELECT
     [FonteEvidenciaOrigem],
     [GrupoOrigem],
     [GrupoAtual_soReferencia],
-    [AnalistaDoRoster],
-    [Categoria],
-    [Resumo]
+    [AnalistaDoRoster]
 FROM #PBI_Saida
 ORDER BY PBI_Ordem;

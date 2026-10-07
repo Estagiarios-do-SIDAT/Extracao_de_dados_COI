@@ -46,7 +46,7 @@ Todas ficam em `powerbi/` e têm o nome da consulta de referência seguido de
 | `consulta_coi_registrados_mensal_power_bi.sql` | Registrados por mês, Incidentes × Solicitações | automático | 1 resultado: `Ano`, `Mes`, `MesAno`, `Incidentes`, `Solicitacoes`, `Total` |
 | `consulta_coi_registrados_encerrados_diario_power_bi.sql` | Registrados × Encerrados por dia | automático | 1 resultado: `Dia`, `Registrados`, `Encerrados` |
 | `consulta_coi_registrados_por_hora_power_bi.sql` | Registrados por hora do dia, mês a mês | automático | 1 resultado: `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `QtdRegistrados` |
-| `consulta_coi_registrados_detalhe_power_bi.sql` | Uma linha por SDM registrado, com a evidência e os dados da cadeia, mais `Categoria` e `Resumo` do chamado | automático | 1 resultado, 29 colunas |
+| `consulta_coi_registrados_detalhe_power_bi.sql` | Uma linha por SDM registrado, com a evidência e os dados da cadeia | automático | 1 resultado, 27 colunas |
 | `consulta_coi_registrados_por_evidencia_power_bi.sql` | Composição dos Registrados por evidência, e as ressalvas | automático | 1 resultado, 7 colunas |
 | `consulta_coi_registrados_por_registrador_power_bi.sql` | Registrados agrupados por quem abriu o chamado | automático | 1 resultado, 14 colunas |
 | `consulta_coi_registrados_validacao_power_bi.sql` | Sanidade da regra: totais, 16 asserções, consistência, casos de referência e ressalvas | automático | resultados empilhados |
@@ -55,7 +55,7 @@ Todas ficam em `powerbi/` e têm o nome da consulta de referência seguido de
 
 | Consulta do Power BI | Finalidade | Período | Saída |
 |---|---|---|---|
-| `consulta_coi_encerrados_power_bi.sql` | Uma linha por SDM encerrado pelo COI (`Categoria` = `Símbolo`, mantida a coluna antiga) | automático | 1 resultado, 15 colunas |
+| `consulta_coi_encerrados_power_bi.sql` | Uma linha por SDM encerrado pelo COI | automático | 1 resultado, 14 colunas |
 | `consulta_coi_pesquisa_satisfacao_encerrados_power_bi.sql` | Pesquisa de satisfação dos Encerrados | automático | resultados empilhados |
 
 ### Conciliação com os relatórios do fornecedor
@@ -135,8 +135,6 @@ Nos resultados empilhados:
 - cada linha traz preenchidas só as colunas do seu `TipoResultado`; as demais
   vêm vazias;
 - colunas com o mesmo nome em mais de um resultado são a mesma coluna;
-- `Categoria` e `Resumo` (categoria e resumo do chamado no `call_req`) vêm no
-  fim, preenchidas só nas linhas por SDM (detalhe);
 - as linhas saem na ordem da referência;
 - colunas de texto saem como texto Unicode, com os mesmos valores.
 

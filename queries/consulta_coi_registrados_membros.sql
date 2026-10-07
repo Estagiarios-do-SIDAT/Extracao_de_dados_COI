@@ -318,20 +318,8 @@ SELECT
     o.abertura_br AS DataAbertura,
     CASE o.tipo WHEN 'I' THEN N'Incidente' ELSE N'Solicitação' END AS Tipo,
     ISNULL(NULLIF(cn.userid, N''), N'-') AS LogAgent,
-    o.nome_analista AS NomeAnalista,
-    ISNULL(catx.sym, N'N/A') AS Categoria,
-    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
+    o.nome_analista AS NomeAnalista
 FROM #Pop AS o
 JOIN #Per AS p ON p.periodo = o.periodo
 LEFT JOIN #ContNorm AS cn ON cn.contact_uuid = o.log_agent
-OUTER APPLY (
-    -- Categoria e Resumo do registro principal do chamado (call_req), so
-    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
-    SELECT TOP (1) cx.summary, cx.category
-    FROM dbo.call_req AS cx
-    WHERE cx.ref_num = o.sdm
-    ORDER BY cx.id
-) AS crx
-LEFT JOIN dbo.prob_ctg AS catx
-    ON catx.persid = crx.category
 ORDER BY p.ord, o.abertura_br, o.sdm;

@@ -28,8 +28,7 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 │   ├── powerbi-query.md                   documentação das consultas do Power BI
 │   └── documentacao-powerbi-coi.html      versão resumida para o Power BI
 ├── docs/
-│   ├── coi-calculation.md                 regras de cálculo, a partir de queries/
-│   └── feriados.txt                       calendário comum de feriados do TCU (cópia; não usado pelas consultas do COI)
+│   └── coi-calculation.md                 regras de cálculo, a partir de queries/
 ├── project-context/
 │   └── COI-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
 ├── support/

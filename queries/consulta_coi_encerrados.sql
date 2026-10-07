@@ -268,10 +268,6 @@ SELECT
     END AS [Tipo Chamado],
 
     ISNULL(pc.sym, N'N/A') AS [Símbolo],
-    -- Categoria: o mesmo prob_ctg.sym de [Símbolo], com o nome padrao das
-    -- consultas do Power BI dos outros nucleos. [Símbolo] continua, para nao
-    -- quebrar quem le a saida por nome de coluna.
-    ISNULL(pc.sym, N'N/A') AS [Categoria],
 
     LTRIM(RTRIM(ISNULL(r.summary, N''))) AS [Resumo],
 
@@ -357,7 +353,6 @@ SELECT
     [SDM],
     [Tipo Chamado],
     [Símbolo],
-    [Categoria],
     [Resumo],
     [Item de Configuração],
     [Prioridade],

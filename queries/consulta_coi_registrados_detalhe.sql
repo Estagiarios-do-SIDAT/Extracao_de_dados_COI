@@ -1288,12 +1288,6 @@ SELECT
                 WHEN 'R' THEN N'Solicitação'
                 ELSE N'N/A' END                     AS Tipo,
 
-    -- CATEGORIA E RESUMO do registro principal do chamado (call_req), so
-    -- informativos: mesma definicao das consultas do Power BI dos outros
-    -- nucleos. call_req.id e a chave; prob_ctg.persid e a chave da categoria.
-    ISNULL(cat.sym, N'N/A')                         AS Categoria,
-    LTRIM(RTRIM(ISNULL(cr.summary, N'')))           AS Resumo,
-
     -- QUEM ABRIU - auditoria. Nao e o ator que trouxe o chamado para o COI.
     r.log_agent                                     AS RegistradorUUID,
     ISNULL(NULLIF(LTRIM(RTRIM(reg.userid)), N''), N'(não resolvido)') AS RegistradorUserID,
@@ -1328,10 +1322,6 @@ SELECT
 FROM #Registrados AS r
 LEFT JOIN dbo.ca_contact AS reg
     ON reg.contact_uuid = r.log_agent
-LEFT JOIN dbo.call_req AS cr
-    ON cr.id = r.id
-LEFT JOIN dbo.prob_ctg AS cat
-    ON cat.persid = cr.category
 ORDER BY
     r.registro_br,
     r.SDM;

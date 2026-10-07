@@ -605,21 +605,9 @@ SELECT
     c.fonte_evidencia AS FonteEvidenciaOrigem,
     c.grupo_origem AS GrupoOrigem,
     ISNULL(NULLIF(cg.nome_bruto, N''), N'(grupo nao resolvido)') AS GrupoAtual_soReferencia,
-    CASE WHEN c.no_total_coi = 1 THEN N'sim' ELSE N'nao' END AS EntraNoTotalCOI,
-    ISNULL(catx.sym, N'N/A') AS Categoria,
-    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
+    CASE WHEN c.no_total_coi = 1 THEN N'sim' ELSE N'nao' END AS EntraNoTotalCOI
 FROM #Cls AS c
 JOIN #Per AS p ON p.periodo = c.periodo
 LEFT JOIN #ContNorm AS cn ON cn.contact_uuid = c.log_agent
 LEFT JOIN #ContNorm AS cg ON cg.contact_uuid = c.group_id
-OUTER APPLY (
-    -- Categoria e Resumo do registro principal do chamado (call_req), so
-    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
-    SELECT TOP (1) cx.summary, cx.category
-    FROM dbo.call_req AS cx
-    WHERE cx.ref_num = c.sdm
-    ORDER BY cx.id
-) AS crx
-LEFT JOIN dbo.prob_ctg AS catx
-    ON catx.persid = crx.category
 ORDER BY p.ord, c.abertura_br, c.sdm;

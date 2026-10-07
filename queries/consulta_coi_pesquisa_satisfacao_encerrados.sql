@@ -360,20 +360,8 @@ ORDER BY r.com_satisfacao DESC;
 --------------------------------------------------------------------------------
 SELECT
     r.SDM,
-    r.resposta_avaliada AS RespostaSatisfacao,
-    ISNULL(catx.sym, N'N/A') AS Categoria,
-    LTRIM(RTRIM(ISNULL(crx.summary, N''))) AS Resumo
+    r.resposta_avaliada AS RespostaSatisfacao
 FROM #Resultado AS r
-OUTER APPLY (
-    -- Categoria e Resumo do registro principal do chamado (call_req), so
-    -- informativos. TOP (1) por seguranca: ref_num identifica o chamado.
-    SELECT TOP (1) cx.summary, cx.category
-    FROM dbo.call_req AS cx
-    WHERE cx.ref_num = r.SDM
-    ORDER BY cx.id
-) AS crx
-LEFT JOIN dbo.prob_ctg AS catx
-    ON catx.persid = crx.category
 WHERE r.resposta_avaliada IS NOT NULL
 ORDER BY r.SDM;
 

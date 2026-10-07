@@ -25005,3 +25005,41 @@ móveis 18-04-2025 e 03-04-2026 (Paixão de Cristo); pontos facultativos 2025:
 31-12; 2026: 02-01, 16-02, 17-02, 18-02, 02-04, 20-04, 04-06, 05-06, 29-06,
 28-10, 24-12, 31-12. Ao sair uma Portaria nova, registrar aqui número, data e
 código.
+
+## 74. 2026-10-07 (2ª) — correção de escopo: COI volta ao schema anterior e fica sem calendário de feriados
+
+**Esta seção SUPERSEDE a §73** no que diz respeito a `Categoria`/`Resumo` e ao
+`docs/feriados.txt`. A §73 permanece como registro do que foi feito e não foi
+reescrita.
+
+Duas extrapolações de escopo foram desfeitas:
+
+1. **`Categoria` e `Resumo` não eram para o COI.** O requisito valia só para a
+   Virtual TI (onde as duas já existiam). As 12 consultas alteradas em `f2728db`
+   (6 de `queries/`, 6 de `powerbi/`) voltaram ao texto exato de `7c643f9`:
+   todas as mudanças de SQL daquele commit eram de `Categoria`/`Resumo`
+   (colunas, tabela `#PBI_Saida`, `INSERT`, `OUTER APPLY`/`LEFT JOIN` em
+   `call_req`/`prob_ctg`). `Resumo` de Encerrados já existia e continua;
+   `Categoria` de Encerrados saiu. `docs/coi-calculation.md` voltou a
+   `7c643f9` e `powerbi/powerbi-query.md` voltou a 27 (detalhe) e 14
+   (encerrados) colunas, sem a nota das colunas empilhadas.
+2. **O COI não usa o calendário de feriados.** Nenhuma consulta do COI leu o
+   arquivo em momento algum (sem `@Feriados`, sem leitor, sem `tools/`, sem
+   SharePoint, sem Horário TCU). A cópia `docs/feriados.txt` entrou só como
+   documento em `7c643f9` e saiu agora, junto com a linha dela no README. As
+   cópias do calendário passam a ser quatro: `docs/feriados.txt` de Decision,
+   A2B e Virtual, e `Documentos e Relatórios/feriados.txt`; o
+   `verificar_feriados.ps1` desses repositórios deixou de procurar cópia no COI.
+
+Mantido da §73: a documentação do Power BI em `powerbi/` (`powerbi-query.md` e
+`documentacao-powerbi-coi.html`) e os caminhos novos no README.
+
+Conferência: contra `6eb634d` (antes do calendário e das colunas), os 24 SQLs
+e `docs/coi-calculation.md` são idênticos; só mudam os caminhos da
+documentação do Power BI e este histórico. Os blocos `REGRA CANONICA DE
+REGISTRADOS COI` (`e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc`)
+e `REGRA COMPARTILHADA TECNICOS COI`
+(`c1fb8ab920b6a5cadd2f35b8359889c9bcccc6eefbe8b8d7c48bd2147ab7d9ad`) não
+mudaram. Como o texto SQL é o mesmo já validado em `7c643f9` (e as saídas
+antigas foram registradas na §73: mesmas linhas e valores), o resultado das
+consultas é o do baseline.

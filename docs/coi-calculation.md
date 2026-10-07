@@ -340,8 +340,7 @@ um grupo inválido não se confunda com um período sem encerramentos.
 
 Uma linha por SDM, ordenada por data de encerramento:
 
-`SDM`, `Tipo Chamado`, `Símbolo` (categoria), `Categoria` (a mesma categoria,
-com o nome padrão das consultas do Power BI), `Resumo`, `Item de Configuração`,
+`SDM`, `Tipo Chamado`, `Símbolo` (categoria), `Resumo`, `Item de Configuração`,
 `Prioridade`, `Status`, `Código Status`, `Data de Abertura`, `Data de
 Encerramento`, `Data de Resolução`, `Responsável`, `Grupo Atual`, `UUID Grupo
 Atual`.
@@ -467,7 +466,6 @@ população de Registrados. É a prova nominal do total.
 | Quem abriu | `RegistradorUUID`, `RegistradorUserID`, `RegistradorNome` |
 | Cadeia de transferências | `PrimeiraOrigemGrupo`, `PrimeiroDestinoGrupo`, `DataPrimeiroEventoGrupo`, `QtdEventosGrupo`, `QtdAncorasGrupo`, `QtdAncorasAntesDo1oLegivel`, `DataPrimeiraEntradaNoCOI` |
 | Registro de criação | `GrupoInit`, `InitConsistenteComReconstrucao` |
-| Contexto do chamado | `Categoria` e `Resumo` (do `call_req`, só informativos) |
 | Estado atual | `UUIDGrupoAtual`, `GrupoAtual` |
 | Conferência | `AbertoAntesDoPeriodo`, `Anomalia` |
 
