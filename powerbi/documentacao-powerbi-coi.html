@@ -8,7 +8,7 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <p style='margin:0 0 12px 0;color:#57606a'>O que o painel mede, de onde vêm os dados, quais regras definem cada número e como conferir o resultado.</p>
 
 <div style='background:#eef5fc;border-left:4px solid #0b5cad;padding:10px 12px;margin:0 0 16px 0'>
-<b>Em uma linha:</b> o painel mede a <b>volumetria</b> do COI — quantos chamados <b>entram</b> no COI (Registrados) e quantos o COI <b>encerra</b> (Encerrados) — nos <b>meses completos</b> a partir de março de 2026, até 12 meses. São <b>7 consultas</b> SQL, cada uma com a mesma regra da sua consulta de referência.
+<b>Em uma linha:</b> o painel mede a <b>volumetria</b> do COI — quantos chamados <b>entram</b> no COI (Registrados) e quantos o COI <b>encerra</b> (Encerrados) — nos <b>meses completos</b> a partir de março de 2026, até 12 meses. São <b>6 consultas</b> SQL, cada uma com a mesma regra da sua consulta de referência.
 </div>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>1. Indicadores</h2>
@@ -62,8 +62,7 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado registrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados diário</td><td style='border:1px solid #d0d7de;padding:4px 6px'>dia, inclusive sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês), as duas séries na mesma linha</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e conta</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td></tr>
 </table>
@@ -80,7 +79,7 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Quantidade de pesquisas e o detalhe por chamado encerrado</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Este conteúdo: indicadores, regras, fontes, consultas e funcionamento do painel</td></tr>
 </table>
-<p>As sete consultas usam o <b>mesmo período</b> e trazem o mês de cada linha, o que permite um único filtro <b>Mês/Ano</b> para as cinco páginas analíticas. A sincronização do filtro, os relacionamentos e as medidas são configurados no modelo do Power BI.</p>
+<p>As seis consultas usam o <b>mesmo período</b> e trazem o mês de cada linha, o que permite um único filtro <b>Mês/Ano</b> para as cinco páginas analíticas. A sincronização do filtro, os relacionamentos e as medidas são configurados no modelo do Power BI.</p>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>6. Período</h2>
 <ul style='margin-top:4px'>
@@ -113,12 +112,12 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <li><b>Registrados fecham:</b> as linhas do detalhe de Registrados são iguais à soma de Registrados do diário, do por hora e do por membro.</li>
 <li><b>Encerrados fecham:</b> as linhas de Encerrados são iguais à soma de Encerrados do diário, do por hora e do por membro, e às linhas da Satisfação.</li>
 <li><b>Tipos fecham:</b> Incidentes + Solicitações = total, em Registrados e em Encerrados.</li>
-<li><b>Calendário completo:</b> todos os dias no diário e 24 horas por mês no por hora.</li>
+<li><b>Calendário completo:</b> todos os dias no diário e 24 horas por mês no por hora, inclusive as horas sem movimento.</li>
 </ol>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>10. Manutenção</h2>
 <p><b>Onde fica o SQL:</b> Página Inicial › <b>Transformar dados</b> › selecione a consulta › em <b>Etapas aplicadas</b>, clique na <b>engrenagem</b> da etapa <b>Fonte</b> › <b>Opções avançadas</b> › campo <b>Instrução SQL</b>. Depois de editar: <b>OK</b> › <b>Fechar e aplicar</b>, e aprove a <b>consulta nativa</b> quando o Power BI pedir.</p>
-<p><b>Conexão:</b> SQL Server, banco <b>mdb</b>, modo <b>Importação</b>, arquivo inteiro na Instrução SQL, <b>Adicionar colunas de relação</b> desmarcado. Para mudar a cobertura, altere <b>@PBI_QuantidadeMeses</b> nas sete consultas.</p>
+<p><b>Conexão:</b> SQL Server, banco <b>mdb</b>, modo <b>Importação</b>, arquivo inteiro na Instrução SQL, <b>Adicionar colunas de relação</b> desmarcado. Para mudar a cobertura, altere <b>@PBI_QuantidadeMeses</b> nas seis consultas.</p>
 <p><b>Grupo alvo de Encerrados:</b> todas as consultas usam <b>@COI_Novo</b> (fila COI). No diário, para consultar o grupo anterior, troque a atribuição:</p>
 <p style='font-family:Consolas,monospace;background:#f6f8fa;padding:8px 10px'>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Novo;&nbsp;&nbsp;&nbsp;-- padrão<br>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Antigo;&nbsp;-- grupo anterior</p>
 <p>Só a série Encerrados muda. Com o grupo anterior, ela fica vazia a partir de abril de 2026.</p>

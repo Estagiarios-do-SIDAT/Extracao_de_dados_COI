@@ -36,22 +36,22 @@ referência funcional do COI.
 O COI não tem FAIA nem FARC. O que se mede é **volumetria**: quantos chamados
 entram no COI, quantos o COI encerra e em que horário os registros acontecem.
 
-São quinze consultas, em três famílias:
+São dezesseis consultas, em três famílias:
 
 | Família | Consultas | Regra |
 |---|---|---|
-| **Registrados** | `mensal`, `encerrados_diario`, `por_hora`, `detalhe`, `por_registrador`, `por_evidencia`, `validacao` e a série de registrados de `registrados_encerrados_por_membro` | Primeira entrada do chamado no COI — seções [3](#3-chamados-registrados) a [5](#5-automações) |
-| **Encerrados** | `consulta_coi_encerrados.sql`, `encerrados_por_hora`, `pesquisa_satisfacao_encerrados`, `pesquisa_satisfacao_encerrados_detalhe` e as séries de encerrados do diário e do por membro | Fechamento no grupo auditado — seção [6](#6-chamados-encerrados) |
+| **Registrados** | `mensal`, `encerrados_diario`, `por_hora`, `detalhe`, `por_registrador`, `por_evidencia`, `validacao` e as séries de registrados de `registrados_encerrados_por_membro` e `registrados_encerrados_por_hora` | Primeira entrada do chamado no COI — seções [3](#3-chamados-registrados) a [5](#5-automações) |
+| **Encerrados** | `consulta_coi_encerrados.sql`, `encerrados_por_hora`, `pesquisa_satisfacao_encerrados`, `pesquisa_satisfacao_encerrados_detalhe` e as séries de encerrados do diário, do por membro e do por hora | Fechamento no grupo auditado — seção [6](#6-chamados-encerrados) |
 | **Conciliação por abertura** | `membros`, `total_com_tecnicos`, `universo_bruto` | Chamados abertos por analistas do COI e por contas técnicas — seção [12](#12-membros-contas-técnicas-e-universo-bruto) |
 
-As oito consultas que contam Registrados aplicam **a mesma regra**, com o mesmo
-texto: as sete originais e a de Registrados × Encerrados por membro. O que muda
+As nove consultas que contam Registrados aplicam **a mesma regra**, com o mesmo
+texto: as sete originais e as de Registrados × Encerrados por membro e por hora. O que muda
 entre elas é só a forma de agrupar e apresentar o resultado. Por isso os totais
 de uma batem com os das outras para o mesmo período. Da mesma forma, as
 consultas de Encerrados copiam literalmente a regra e a conferência do grupo
 alvo de `consulta_coi_encerrados.sql`.
 
-Sete delas alimentam o painel do Power BI; quais são, e por que as demais ficam
+Seis delas alimentam o painel do Power BI; quais são, e por que as demais ficam
 só em `queries/`, está em `powerbi/powerbi-query.md`.
 
 Registrado e Encerrado são **indicadores diferentes**, com regras e datas
@@ -445,6 +445,31 @@ fechamento**, em horário de Brasília — nunca a hora de registro.
 - As 24 horas do período somam as linhas de `consulta_coi_encerrados.sql`.
 - Parâmetros: `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`. Com grupo alvo
   inválido, o resultado sai vazio, como em Encerrados.
+
+### Registrados × Encerrados por hora
+
+`queries/consulta_coi_registrados_encerrados_por_hora.sql`. As duas
+distribuições acima na mesma linha: uma linha por **mês e hora**, 24 por mês,
+inclusive as horas sem movimento.
+
+| Coluna | Significado | Hora usada |
+|---|---|---|
+| `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel` | A célula do calendário | — |
+| `Registrados` | Chamados cuja **primeira entrada no COI** caiu naquela hora do mês | Da `DataRegistroCOI` |
+| `Encerrados` | Chamados que o COI **fechou** naquela hora do mês | Do `close_date` |
+
+As duas séries são calculadas **separadamente**, cada uma com a sua regra —
+`Registrados` pelo bloco canônico, `Encerrados` pela regra da seção
+[6](#6-chamados-encerrados), com a conferência do grupo alvo —, e cada uma é
+agregada sozinha por mês e hora antes de se juntar ao calendário. Não há junção
+entre chamados das duas populações, e por isso nenhuma linha se multiplica. Um
+mesmo chamado pode contar em `Registrados` numa hora e em `Encerrados` em outra.
+
+Para o mesmo período, `Registrados` é igual a `QtdRegistrados` de
+`consulta_coi_registrados_por_hora.sql` e `Encerrados` é igual a `QtdEncerrados`
+de `consulta_coi_encerrados_por_hora.sql`, em cada mês e hora. Parâmetros:
+`@InicioBR`, `@FimBR` e `@COI_GrupoAlvo`; com grupo alvo inválido, a série
+`Encerrados` sai zerada, como no diário.
 
 ---
 
@@ -882,6 +907,7 @@ do dia.
 | Registrados × Encerrados por membro | `@InicioBR`, `@FimBR`, `@COI_GrupoAlvo`, `@MostrarDiagnostico` |
 | Encerrados | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@MostrarDiagnostico` |
 | Encerrados por hora | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo` |
+| Registrados × Encerrados por hora | `@InicioBR`, `@FimBR`, `@COI_GrupoAlvo` |
 | Pesquisa de satisfação | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@SequenciaPerguntaAvaliada` (padrão `40`), `@MostrarConferencia` |
 | Pesquisa de satisfação, detalhe | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@SequenciaPerguntaAvaliada` (padrão `40`) |
 | Membros, contas técnicas, universo bruto | Tabela de períodos e lista de analistas no início de cada arquivo |

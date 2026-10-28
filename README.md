@@ -10,24 +10,25 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 
 ```text
 .
-├── queries/                                  15 consultas de referência (fonte de verdade)
+├── queries/                                  16 consultas de referência (fonte de verdade)
 │   ├── consulta_coi_encerrados.sql                               painel
-│   ├── consulta_coi_encerrados_por_hora.sql                      painel
+│   ├── consulta_coi_encerrados_por_hora.sql
 │   ├── consulta_coi_pesquisa_satisfacao_encerrados.sql
 │   ├── consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql   painel
 │   ├── consulta_coi_registrados_detalhe.sql                      painel
 │   ├── consulta_coi_registrados_encerrados_diario.sql            painel
+│   ├── consulta_coi_registrados_encerrados_por_hora.sql          painel
 │   ├── consulta_coi_registrados_encerrados_por_membro.sql        painel
 │   ├── consulta_coi_registrados_membros.sql
 │   ├── consulta_coi_registrados_mensal.sql
 │   ├── consulta_coi_registrados_por_evidencia.sql
-│   ├── consulta_coi_registrados_por_hora.sql                     painel
+│   ├── consulta_coi_registrados_por_hora.sql
 │   ├── consulta_coi_registrados_por_registrador.sql
 │   ├── consulta_coi_registrados_total_com_tecnicos.sql
 │   ├── consulta_coi_registrados_universo_bruto.sql
 │   └── consulta_coi_registrados_validacao.sql
 ├── powerbi/
-│   ├── <consulta de queries/>_power_bi.sql   7 arquivos: as consultas marcadas painel acima
+│   ├── <consulta de queries/>_power_bi.sql   6 arquivos: as consultas marcadas painel acima
 │   ├── powerbi-query.md                   documentação das consultas do Power BI
 │   └── documentacao-powerbi-coi.html      conteúdo da página Documentação do painel
 ├── docs/
@@ -55,7 +56,7 @@ A regra de negócio é construída a partir do histórico de fila, do tipo de ch
 
 O bloco de consultas de registrados responde à pergunta: **quais chamados efetivamente entraram na base do COI no período**.
 
-Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As oito consultas que contam Registrados (as sete abaixo e a de Registrados × Encerrados por membro) e as quatro versões do Power BI que as usam compartilham um **bloco canônico** idêntico, conferido por SHA256. A regra está descrita em [`docs/coi-calculation.md`](docs/coi-calculation.md); a precedência e o hash vigente estão no Histórico Mestre.
+Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As nove consultas que contam Registrados (as sete abaixo e as de Registrados × Encerrados por membro e por hora) e as quatro versões do Power BI que as usam compartilham um **bloco canônico** idêntico, conferido por SHA256. A regra está descrita em [`docs/coi-calculation.md`](docs/coi-calculation.md); a precedência e o hash vigente estão no Histórico Mestre.
 
 **Indicadores**:
 
@@ -63,7 +64,8 @@ Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo,
 |---|---|---|
 | [`queries/consulta_coi_registrados_mensal.sql`](queries/consulta_coi_registrados_mensal.sql) | Registrados por mês, separando Incidentes e Solicitações | `Ano, Mes, MesAno, Incidentes, Solicitacoes, Total` |
 | [`queries/consulta_coi_registrados_encerrados_diario.sql`](queries/consulta_coi_registrados_encerrados_diario.sql) | Registrados × Encerrados por dia (I e R juntos) | `Dia, Registrados, Encerrados` |
-| [`queries/consulta_coi_registrados_por_hora.sql`](queries/consulta_coi_registrados_por_hora.sql) | Registrados por hora, dias consolidados | `Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados` |
+| [`queries/consulta_coi_registrados_por_hora.sql`](queries/consulta_coi_registrados_por_hora.sql) | Registrados por hora, dias consolidados (referência; o painel usa a consulta abaixo) | `Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados` |
+| [`queries/consulta_coi_registrados_encerrados_por_hora.sql`](queries/consulta_coi_registrados_encerrados_por_hora.sql) | Registrados × Encerrados por hora, dias consolidados, 24 horas por mês — cada série com a sua regra e a sua hora | `Ano, Mes, MesAno, Hora, HoraLabel, Registrados, Encerrados` |
 | [`queries/consulta_coi_registrados_encerrados_por_membro.sql`](queries/consulta_coi_registrados_encerrados_por_membro.sql) | Registrados (por quem abriu) e Encerrados de cada conta, por mês. O painel usa `EncerradosComoResponsavel` — o responsável pelo chamado, critério do fornecedor; `Encerrados` (quem executou o encerramento) fica para auditoria | `Ano, Mes, MesAno, MembroUUID, MembroUserID, Membro, TipoConta, Registrados, Encerrados, EncerradosComoResponsavel` |
 
 **Auditoria** — a mesma população, por outros ângulos, para provar o número:
@@ -92,7 +94,7 @@ Com a mesma população e a mesma conferência do grupo alvo:
 
 | Arquivo | Para que serve |
 |---|---|
-| [`queries/consulta_coi_encerrados_por_hora.sql`](queries/consulta_coi_encerrados_por_hora.sql) | Encerrados por hora do fechamento, 24 horas por mês: `Ano, Mes, MesAno, Hora, HoraLabel, QtdEncerrados` |
+| [`queries/consulta_coi_encerrados_por_hora.sql`](queries/consulta_coi_encerrados_por_hora.sql) | Encerrados por hora do fechamento, 24 horas por mês: `Ano, Mes, MesAno, Hora, HoraLabel, QtdEncerrados` (referência; o painel usa Registrados × Encerrados por hora) |
 | [`queries/consulta_coi_pesquisa_satisfacao_encerrados.sql`](queries/consulta_coi_pesquisa_satisfacao_encerrados.sql) | Pesquisa de satisfação: resumo (Janela 1), respostas (Janela 2) e conferência |
 | [`queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql`](queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql) | A mesma classificação, uma linha por chamado encerrado, com data e o pedido de pesquisa registrado no SDM |
 
@@ -100,19 +102,18 @@ Com a mesma população e a mesma conferência do grupo alvo:
 
 O painel tem sete páginas: **Início** (navegação), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**.
 
-A pasta `powerbi/` tem **só as 7 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
+A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
 
 | Consulta do Power BI | Páginas |
 |---|---|
 | `consulta_coi_registrados_detalhe_power_bi.sql` | Visão Geral, Por Tipo |
 | `consulta_coi_encerrados_power_bi.sql` | Visão Geral, Por Tipo |
 | `consulta_coi_registrados_encerrados_diario_power_bi.sql` | Visão Geral |
-| `consulta_coi_registrados_por_hora_power_bi.sql` | Por Hora |
-| `consulta_coi_encerrados_por_hora_power_bi.sql` | Por Hora |
+| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | Por Hora |
 | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | Por Membro |
 | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | Satisfação |
 
-Cada uma aplica a mesma regra da sua referência, com período automático (meses completos, até 12, a partir de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto e o resumo da satisfação — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
+Cada uma aplica a mesma regra da sua referência, com período automático (meses completos, até 12, a partir de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto, o resumo da satisfação e as duas por hora separadas — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
 
 A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). O conteúdo da página Documentação, para o visual HTML Content, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
 

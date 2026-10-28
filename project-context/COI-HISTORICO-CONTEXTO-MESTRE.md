@@ -25221,3 +25221,69 @@ regressão encontrada.
 registrador e por membro, §14, §15, §16), `powerbi/powerbi-query.md` (reescrito
 para as 7 consultas e 7 páginas) e `powerbi/documentacao-powerbi-coi.html`
 (conteúdo da página Documentação).
+
+## 76. 2026-10-28 (2ª) — página Por Hora com uma consulta só: Registrados × Encerrados por hora
+
+Nenhuma regra mudou. As duas consultas por hora do Power BI viraram uma, com as
+duas séries na mesma linha; `powerbi/` passa de 7 para **6 consultas**.
+
+### 76.1. O que foi feito
+
+- **Nova referência** `queries/consulta_coi_registrados_encerrados_por_hora.sql`
+  e a sua versão `powerbi/consulta_coi_registrados_encerrados_por_hora_power_bi.sql`
+  (mesmas adaptações `[POWER BI]` das demais: período automático de até 12
+  meses completos, nunca antes de 01/03/2026).
+  Saída: `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `Registrados`,
+  `Encerrados` — 24 linhas por mês, inclusive horas com zero.
+- **Construção.** Bloco canônico de Registrados copiado literalmente de
+  `consulta_coi_registrados_por_hora.sql` (nono consumidor; hora da
+  `DataRegistroCOI`). Regra oficial de Encerrados com a conferência do grupo
+  alvo, copiada de `consulta_coi_registrados_encerrados_por_membro.sql` (hora do
+  `close_date`, `@COI_Novo`). Cada série é agregada **sozinha** por (Ano, Mês,
+  Hora), em tabela com índice único nessa chave, e só depois as duas se ligam ao
+  calendário mês × 24 horas por `LEFT JOIN`. Não há junção entre chamados das
+  duas populações, e nenhuma linha se multiplica.
+- **Saíram de `powerbi/`** `consulta_coi_registrados_por_hora_power_bi.sql` e
+  `consulta_coi_encerrados_por_hora_power_bi.sql`. As referências continuam em
+  `queries/`; o histórico Git guarda as versões do Power BI.
+
+### 76.2. Validação no SQL Server (março a setembro de 2026)
+
+As duas consultas antigas do Power BI (texto de `52d200e`) e a nova rodaram em
+sequência, no mesmo período:
+
+| Conferência | Resultado |
+|---|---|
+| Células mês × hora | 168 = 7 meses × 24, chave única, horas 0 a 23 em todo mês |
+| `Registrados` × `QtdRegistrados` da consulta antiga | iguais nas 168 células |
+| `Encerrados` × `QtdEncerrados` da consulta antiga | iguais nas 168 células |
+| `Ano`, `Mes`, `HoraLabel` | iguais nas 168 células |
+| Registrados por mês | 4.342, 3.680, 3.422, 3.483, 3.398, 3.679, 3.723 — total 25.727, os totais da §75.6 |
+| Encerrados por mês | 478, 728, 593, 612, 583, 589, 453 — total 4.036, os totais da §75.6 |
+| Horas com zero | 2 células de Encerrados, presentes com 0 |
+| Power BI × referência, mesmo período | iguais linha a linha; o texto difere só no período `[POWER BI]` |
+
+Bloco `REGRA CANONICA DE REGISTRADOS COI`:
+`e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc`, 13/13
+cópias (9 em `queries/`, 4 em `powerbi/`). As demais consultas não mudaram.
+
+### 76.3. `powerbi/` agora
+
+| Consulta do Power BI | Páginas |
+|---|---|
+| `registrados_detalhe` | Visão Geral, Por Tipo |
+| `encerrados` | Visão Geral, Por Tipo |
+| `registrados_encerrados_diario` | Visão Geral |
+| `registrados_encerrados_por_hora` | Por Hora |
+| `registrados_encerrados_por_membro` | Por Membro |
+| `pesquisa_satisfacao_encerrados_detalhe` | Satisfação |
+
+Início e Documentação não usam consulta. A tabela da §75.2 vale com essa
+troca: as linhas `registrados_por_hora` e `encerrados_por_hora` passam a ser só
+referência em `queries/`.
+
+### 76.4. Documentação
+
+`README.md` (estrutura, consultas, painel), `docs/coi-calculation.md` (§1 e §9,
+nova subseção Registrados × Encerrados por hora; §15), `powerbi/powerbi-query.md`
+(6 consultas, página Por Hora, alertas) e `powerbi/documentacao-powerbi-coi.html`.

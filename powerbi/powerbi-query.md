@@ -4,7 +4,7 @@ Este documento explica como funcionam as consultas que alimentam o painel do
 COI: o que cada uma entrega, que página do painel ela atende, como o período é
 calculado e como conferir o resultado depois de uma atualização.
 
-São **7 consultas**, todas em `powerbi/`, cada uma com o nome da sua consulta de
+São **6 consultas**, todas em `powerbi/`, cada uma com o nome da sua consulta de
 referência em `queries/` seguido de `_power_bi`. Cada consulta do Power BI
 aplica **a mesma regra** da sua referência; muda apenas o que é necessário para
 o uso no painel, marcado no SQL com `[POWER BI]`. O texto SQL de cada uma fica
@@ -18,7 +18,7 @@ em `docs/coi-calculation.md`. Este documento trata do que é próprio do Power B
 
 ## Índice
 
-1. [As 7 consultas do painel](#1-as-7-consultas-do-painel)
+1. [As 6 consultas do painel](#1-as-6-consultas-do-painel)
 2. [Consultas que ficam só em `queries/`](#2-consultas-que-ficam-só-em-queries)
 3. [Período automático](#3-período-automático)
 4. [Grupo alvo de Encerrados](#4-grupo-alvo-de-encerrados)
@@ -35,7 +35,7 @@ deste arquivo; se os dois divergirem, **vale este**.
 
 ---
 
-## 1. As 7 consultas do painel
+## 1. As 6 consultas do painel
 
 O painel tem sete páginas:
 
@@ -43,7 +43,7 @@ O painel tem sete páginas:
 |---|---|---|---|
 | 1 | **Início** | navegação para as demais páginas | nenhuma |
 | 2 | **Visão Geral** | totais de Registrados e Encerrados, evolução Ano → Mês → Dia e a lista dos chamados | detalhe de registrados, encerrados, diário |
-| 3 | **Por Hora** | distribuição pelas 24 horas do dia, Registrados ou Encerrados | as duas por hora |
+| 3 | **Por Hora** | distribuição pelas 24 horas do dia, Registrados ou Encerrados | Registrados × Encerrados por hora |
 | 4 | **Por Membro** | quantos chamados cada conta registrou e quantos encerramentos cada responsável tem — critério do fornecedor | por membro |
 | 5 | **Por Tipo** | Incidente × Solicitação, em Registrados e em Encerrados | detalhe de registrados, encerrados |
 | 6 | **Satisfação** | pesquisas de satisfação dos chamados encerrados | satisfação, detalhe |
@@ -56,8 +56,7 @@ As cinco páginas analíticas (2 a 6) usam estas consultas:
 | `consulta_coi_registrados_detalhe_power_bi.sql` | 1 linha por SDM **registrado** | 29, entre elas `SDM`, `Categoria`, `Resumo`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro`, `Tipo`, `RegistradorNome`, `FormaRegistroCOI` | Visão Geral (cartão e tabela), Por Tipo |
 | `consulta_coi_encerrados_power_bi.sql` | 1 linha por SDM **encerrado** | 14: `SDM`, `Tipo Chamado`, `Símbolo` (categoria), `Resumo`, `Item de Configuração`, `Prioridade`, `Status`, `Código Status`, `Data de Abertura`, `Data de Encerramento`, `Data de Resolução`, `Responsável`, `Grupo Atual`, `UUID Grupo Atual` | Visão Geral (cartão e tabela), Por Tipo |
 | `consulta_coi_registrados_encerrados_diario_power_bi.sql` | 1 linha por **dia** do período, inclusive dias sem movimento | `Dia`, `Registrados`, `Encerrados` | Visão Geral (gráfico Ano → Mês → Dia) |
-| `consulta_coi_registrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `QtdRegistrados` | Por Hora |
-| `consulta_coi_encerrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `QtdEncerrados` | Por Hora |
+| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `Registrados`, `Encerrados` | Por Hora |
 | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | 1 linha por **mês e conta** com registro ou encerramento | `Ano`, `Mes`, `MesAno`, `MembroUUID`, `MembroUserID`, `Membro`, `TipoConta`, `Registrados`, `Encerrados`, `EncerradosComoResponsavel` | Por Membro |
 | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | 1 linha por SDM **encerrado**, com a pesquisa | `SDM`, `TipoChamado`, `DataEncerramento`, `Ano`, `Mes`, `MesAno`, `StatusSatisfacao`, `PerguntaAvaliada`, `RespostaSatisfacao`, `QtdPerguntasRespondidas`, `DataPesquisa`, `PesquisaSolicitada`, `QtdSolicitacoesPesquisa`, `DataSolicitacaoPesquisa`, `SolicitacaoPesquisa` | Satisfação |
 
@@ -77,7 +76,9 @@ mesmas linhas, mesmos valores.
 
 Três consultas são novas (criadas para o painel, com referência em `queries/`):
 
-- **Encerrados por hora** — a hora do `close_date`, nunca a hora de registro;
+- **Registrados × Encerrados por hora** — as duas séries na mesma linha, cada
+  uma com a sua regra e a sua hora: `DataRegistroCOI` para Registrados,
+  `close_date` para Encerrados, nunca uma no lugar da outra;
 - **Registrados × Encerrados por membro** — quem registrou e a quem se atribui
   cada encerramento, com a classificação da conta (seção 6);
 - **Satisfação, detalhe** — a classificação da pesquisa chamado a chamado, com
@@ -100,6 +101,8 @@ porque não alimentam nenhum visual do painel:
 | `consulta_coi_registrados_total_com_tecnicos.sql` | Conciliação com o fornecedor, períodos fixos |
 | `consulta_coi_registrados_universo_bruto.sql` | Auditoria das contas técnicas, períodos fixos |
 | `consulta_coi_pesquisa_satisfacao_encerrados.sql` | Resumo e lista sem data, que não acompanham o filtro Mês/Ano; o detalhe novo traz a mesma classificação por chamado |
+| `consulta_coi_registrados_por_hora.sql` | A série `Registrados` da consulta Registrados × Encerrados por hora; referência por hora só de Registrados |
+| `consulta_coi_encerrados_por_hora.sql` | A série `Encerrados` da consulta Registrados × Encerrados por hora; referência por hora só de Encerrados |
 
 Elas continuam sendo a ferramenta de auditoria e de conciliação: rodar
 `consulta_coi_registrados_validacao.sql` num período confere a regra de
@@ -109,7 +112,7 @@ Registrados que o painel usa.
 
 ## 3. Período automático
 
-O período é calculado a cada atualização, e é **o mesmo nas 7 consultas** —
+O período é calculado a cada atualização, e é **o mesmo nas 6 consultas** —
 assim o filtro Mês/Ano enxerga os mesmos meses em todas as páginas:
 
 | Limite | Valor |
@@ -138,7 +141,7 @@ ficaram no grupo antigo são do contrato anterior e não entram, como em qualque
 mês. Registrados não depende do grupo alvo e conta março inteiro.
 
 Para mudar a cobertura, altere só `@PBI_QuantidadeMeses`, no início de cada
-consulta, **nas sete**. O piso só deve mudar junto com o grupo alvo.
+consulta, **nas seis**. O piso só deve mudar junto com o grupo alvo.
 
 ---
 
@@ -151,7 +154,7 @@ Encerrados identifica o COI por **um** grupo alvo, escolhido em
 | Consulta do Power BI | Grupo alvo |
 |---|---|
 | Encerrados | `@COI_Novo` — igual à referência |
-| Encerrados por hora | `@COI_Novo` — igual à referência |
+| Registrados × Encerrados por hora | `@COI_Novo` — igual à referência |
 | Registrados × Encerrados por membro | `@COI_Novo` — igual à referência |
 | Satisfação, detalhe | `@COI_Novo` — igual à referência |
 | Registrados × Encerrados por dia | `@COI_Novo` por padrão |
@@ -212,9 +215,8 @@ modelo do Power BI.
 | Visão Geral | Colunas agrupadas, Ano → Mês → Dia | diário | `Dia` na hierarquia; `Registrados` e `Encerrados` somados — cada nível é a soma dos dias |
 | Visão Geral | Tabela Registrados | detalhe de registrados | uma linha por SDM: `SDM`, `DataRegistroCOI`, `Tipo`, `Categoria`, `RegistradorNome`, `Resumo`, `FormaRegistroCOI` |
 | Visão Geral | Tabela Encerrados | encerrados | uma linha por SDM: `SDM`, `Data de Encerramento`, `Tipo Chamado`, `Símbolo`, `Status`, `Responsável`, `Resumo` |
-| Por Hora | Gráfico Registrados | por hora (registrados) | `HoraLabel` no eixo, soma de `QtdRegistrados` |
-| Por Hora | Gráfico Encerrados | por hora (encerrados) | `HoraLabel` no eixo, soma de `QtdEncerrados` |
-| Por Hora | Tabela Hora × Registrados × Encerrados | as duas por hora | ligadas por `MesAno` e `Hora`; as 24 horas vêm das consultas, inclusive com zero |
+| Por Hora | Gráfico Registrados ou Encerrados | Registrados × Encerrados por hora | `HoraLabel` no eixo; soma de `Registrados` ou soma de `Encerrados`, conforme a escolha da página |
+| Por Hora | Tabela Hora × Registrados × Encerrados | Registrados × Encerrados por hora | `HoraLabel`, soma de `Registrados`, soma de `Encerrados`; as 24 horas vêm da consulta, inclusive com zero |
 | Por Membro | Barras agrupadas e tabela | por membro | `Membro` no eixo; soma de `Registrados` e soma de `EncerradosComoResponsavel`, esta com o rótulo **Encerrados**; `TipoConta` para separar membros, pessoas fora do grupo e contas técnicas. A coluna `Encerrados` da consulta **não** entra nos visuais |
 | Por Tipo | Registrados por tipo | detalhe de registrados | contagem de `SDM` por `Tipo` |
 | Por Tipo | Encerrados por tipo | encerrados | contagem de `SDM` por `Tipo Chamado` |
@@ -275,22 +277,22 @@ a consulta inteira de novo e substitui os dados importados.
 
 As consultas de Registrados (detalhe, diário, por hora e por membro) leem o
 histórico de eventos de todos os chamados do período e levam de dois a quatro
-minutos cada, para sete meses. As de Encerrados (encerrados, por hora e
-satisfação) levam segundos.
+minutos cada, para sete meses. As só de Encerrados (encerrados e satisfação)
+levam segundos.
 
 ---
 
 ## 8. Conferência depois de atualizar
 
 1. **Registrados fecham.** Linhas do detalhe de registrados = soma de
-   `Registrados` do diário = soma de `QtdRegistrados` do por hora = soma de
+   `Registrados` do diário = soma de `Registrados` do por hora = soma de
    `Registrados` do por membro.
 2. **Encerrados fecham.** Linhas de encerrados = soma de `Encerrados` do diário
-   = soma de `QtdEncerrados` do por hora = soma de `Encerrados` do por membro =
+   = soma de `Encerrados` do por hora = soma de `Encerrados` do por membro =
    soma de `EncerradosComoResponsavel` do por membro = linhas do detalhe de
    satisfação.
 3. **Calendário completo.** Uma linha por dia no diário; 24 linhas por mês nas
-   duas consultas por hora.
+   consulta por hora.
 4. **Sem duplicidade.** Nos três detalhes, número de linhas = número de SDMs
    distintos; no por membro, uma linha por mês e conta.
 5. **Tipos fecham.** Incidentes + Solicitações = total, em cada detalhe.
@@ -332,10 +334,10 @@ satisfação) levam segundos.
   `[POWER BI]`. Uma mudança de regra é feita na referência e replicada na versão
   do Power BI.
 - **Bloco canônico de Registrados.** O trecho entre `INICIO` e `FIM REGRA
-  CANONICA DE REGISTRADOS COI` é idêntico, byte a byte, nas oito consultas de
-  Registrados de referência (as sete originais e a de Registrados × Encerrados
-  por membro) e nas quatro do Power BI que o usam (detalhe, diário, por hora e
-  por membro). A igualdade é conferida pelo SHA256 do trecho.
+  CANONICA DE REGISTRADOS COI` é idêntico, byte a byte, nas nove consultas de
+  Registrados de referência (as sete originais e as de Registrados × Encerrados
+  por membro e por hora) e nas quatro do Power BI que o usam (detalhe, diário,
+  por hora e por membro). A igualdade é conferida pelo SHA256 do trecho.
 - **Bloco das contas técnicas.** O trecho `REGRA COMPARTILHADA TECNICOS COI` é
   idêntico nas duas consultas de contas técnicas de `queries/`. Nenhuma consulta
   do painel o usa.

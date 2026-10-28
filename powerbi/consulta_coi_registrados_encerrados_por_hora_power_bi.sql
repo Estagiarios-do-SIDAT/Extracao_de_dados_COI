@@ -2,7 +2,7 @@ USE mdb;
 SET NOCOUNT ON;
 
 --------------------------------------------------------------------------------
--- VERSAO POWER BI de queries/consulta_coi_registrados_por_hora.sql
+-- VERSAO POWER BI de queries/consulta_coi_registrados_encerrados_por_hora.sql
 --
 -- A regra e a da consulta de /queries, que e a fonte de verdade. Este arquivo
 -- e o texto dela sem alteracao, exceto pelas adaptacoes abaixo, marcadas no
@@ -55,59 +55,58 @@ DECLARE @PBI_InicioBR datetime2(0) =
 
 /*
 ================================================================================
-COI - Chamados REGISTRADOS pelo COI, por hora do dia
+COI - REGISTRADOS x ENCERRADOS pelo COI, por hora do dia
 ================================================================================
 
-Indicador: Grafico 3 - Registrados pelo COI por hora, dias consolidados.
+Indicador: pagina Por Hora - em que hora do dia os chamados ENTRAM no COI e em
+que hora o COI os ENCERRA, dias consolidados em cada mes.
 
-Saida: UM unico result set.
-    Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados
+Saida: UM unico result set, 24 linhas por mes do periodo.
+    Ano, Mes, MesAno, Hora, HoraLabel, Registrados, Encerrados
 
-A hora e apenas DIMENSAO DE AGREGACAO do open_date - a mesma populacao canonica
-da consulta mensal, agrupada por DATEPART(HOUR). Nao ha filtro adicional, nem
-regra especifica por hora: a elegibilidade COI e do periodo consultado.
+    Todas as 24 horas aparecem em cada mes, inclusive as de quantidade zero nas
+    duas series.
 
-Todas as 24 horas aparecem para cada mes, inclusive as de quantidade zero.
+AS DUAS SERIES SAO CALCULADAS SEPARADAMENTE, cada uma com a sua regra e a sua
+data, e so se encontram na celula (mes, hora) - como em
+consulta_coi_registrados_encerrados_diario.sql, da qual esta consulta e a
+contrapartida "por hora":
 
-REGRA DE "REGISTRADO PELO COI" - canonica, baseada no sistema fonte
+    Registrados  populacao: regra canonica de Registrados (bloco abaixo,
+                 IDENTICO byte a byte ao das consultas de Registrados).
+                 Hora: a da DataRegistroCOI, em horario do Brasil - a mesma de
+                 consulta_coi_registrados_por_hora.sql (QtdRegistrados).
 
-    type IN ('I','R')
-    E  PRIMEIRA ENTRADA NA FILA DO COI, em toda a vida do chamado, caindo
-       dentro da janela consultada
-    -> uma linha por SDM, sem filtro de analista, categoria, motivo ou status.
+    Encerrados   populacao: regra oficial de Encerrados, LITERALMENTE a de
+                 consulta_coi_encerrados.sql (close_date no periodo, I/R,
+                 CL/CLUNRSLV, grupo ATUAL = @COI_GrupoAlvo valido).
+                 Hora: a do close_date, em horario do Brasil - a mesma de
+                 consulta_coi_encerrados_por_hora.sql (QtdEncerrados).
 
-    O eixo NAO e call_req.open_date: e a DataRegistroCOI reconstruida. Um SDM
-    conta UMA vez, na primeira entrada; reentrada nao conta de novo.
+    Cada serie e AGREGADA SOZINHA por (Ano, Mes, Hora) - #PorHoraRegistrados e
+    #PorHoraEncerrados, com indice UNICO nessa chave - e so depois as duas sao
+    ligadas ao calendario por LEFT JOIN. Nao ha juncao entre chamados das duas
+    populacoes, e por isso nenhuma linha se multiplica: cada celula tem no maximo
+    uma linha de cada agregado.
 
-    A evidencia PRINCIPAL e a cadeia real de mudancas de grupo em act_log. O
-    '%GROUP=' do INIT e apenas AUXILIAR - ha chamados cujo INIT declara uma fila
-    que a primeira mudanca de grupo contradiz, e nesses a cadeia vence. Quando
-    nao existe NENHUM evento de grupo, aplica-se o fallback de estado autorizado
-    pela gestao do COI: a fila em que o chamado permaneceu.
+    Um mesmo chamado pode contar em Registrados numa hora e em Encerrados em
+    outra, so numa das series, ou em nenhuma. Registrados - Encerrados NAO e o
+    estoque em aberto do COI.
 
-    O detalhamento, os aliases historicos, a janela de transicao de contrato e o
-    motivo de cada decisao estao no bloco delimitado por INICIO/FIM REGRA
-    CANONICA DE REGISTRADOS COI, IDENTICO byte a byte nas SETE consultas de
-    Registrados e conferivel por SHA256.
+    As somas de cada serie fecham com o detalhe correspondente:
+        SUM(Registrados) = linhas de consulta_coi_registrados_detalhe.sql
+        SUM(Encerrados)  = linhas de consulta_coi_encerrados.sql
 
-O RSP HISTORICO NAO E O ALVO
+    Esta consulta substitui, no Power BI, as versoes Power BI de
+    consulta_coi_registrados_por_hora.sql e de consulta_coi_encerrados_por_hora.sql;
+    as duas continuam em /queries como referencia. Para o mesmo periodo,
+    Registrados = QtdRegistrados e Encerrados = QtdEncerrados em cada mes e hora.
 
-    Os relatorios antigos do fornecedor vieram de OUTRA ferramenta/base, o
-    proprio fornecedor confirmou inconsistencias, e a aba DADOS guarda apenas
-    valores digitados - sem pivot, conexao ou formula que revele a regra. Eles
-    valem como referencia externa de reconciliacao; a definicao tecnica do
-    indicador e esta consulta, sobre o sistema fonte atual.
+O BLOCO CANONICO
 
-    Nenhum filtro aqui existe para aproximar numero de relatorio antigo.
-
-LIMITE CONHECIDO - historico nao e imutavel
-
-    Uma execucao de hoje pode divergir de um relatorio emitido meses atras se
-    chamados foram corrigidos ou incluidos depois com open_date retroativo. O
-    horizonte de elegibilidade impede que MOVIMENTACAO posterior mude um periodo
-    fechado, mas nao reconstroi um snapshot antigo. Se for exigido que meses
-    fechados nunca mudem, o caminho e snapshot mensal persistido no fechamento -
-    decisao de projeto, nao implementada aqui.
+    O comentario interno do bloco ainda fala em "SETE" consultas: ele e mantido
+    byte a byte, porque qualquer mudanca de texto mudaria o SHA256 conferido. Esta
+    e mais uma consumidora do bloco, sem altera-lo.
 
 Somente leitura. Batch unico. Nao existe GO neste arquivo.
 ================================================================================
@@ -120,8 +119,7 @@ Somente leitura. Batch unico. Nao existe GO neste arquivo.
 -- Nao usar 23:59:59 como fim: o chamado do ultimo segundo do dia ficaria de fora.
 --
 -- open_date e close_date em dbo.call_req sao epoch UTC em segundos (int).
--- Brasil = UTC-3 fixo (sem horario de verao desde 2019), mesma conversao ja
--- validada em decision/ e protect4/.
+-- Brasil = UTC-3 fixo (sem horario de verao desde 2019).
 --------------------------------------------------------------------------------
 DECLARE @HorasBrasilParaUTC int = 3;
 DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
@@ -133,6 +131,15 @@ DECLARE @FimBR    datetime2(0) = @PBI_FimBR;      -- EXCLUSIVO
 DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
 DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
 
+-- Identidade do COI por UUID. Usada SO no filtro de ENCERRADOS: a regra de
+-- Registrados NAO usa UUID, decide por nome historico.
+DECLARE @COI_Antigo varbinary(16) = 0xDA7095D797E3FE498A62B79CB7EAED15;  -- 'Contrato 7/2023 - COI'
+DECLARE @COI_Novo   varbinary(16) = 0x3C11B3A9EBCE5D498E2F7D7FF385F967;  -- 'COI'
+
+-- Grupo alvo de ENCERRADOS. UM grupo por apuracao: producao/contrato vigente ->
+-- @COI_Novo. NAO somar os dois, NAO inferir pela data (os grupos coexistiram).
+-- Ver o cabecalho de consulta_coi_encerrados.sql.
+DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Novo;
 
 --------------------------------------------------------------------------------
 -- INICIO REGRA CANONICA DE REGISTRADOS COI
@@ -1234,13 +1241,63 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- [C] CALENDARIO - existe para que o grafico tenha todos os dias/meses/horas do
---     intervalo, inclusive os de quantidade zero. Sem isso o eixo fica com
---     buracos.
+-- INICIO REGRA OFICIAL DE ENCERRADOS COI  (NAO ALTERAR SEM REVALIDAR)
 --
---     MesAno sai como AAAA-MM de proposito: DATENAME/FORMAT dependem do idioma
---     da sessao e produziriam rotulo diferente conforme o servidor. AAAA-MM e
---     estavel e ordena corretamente como texto.
+-- Identica a queries/consulta_coi_encerrados.sql, inclusive a validacao do grupo
+-- alvo:
+--     close_date na janela  E  type IN ('I','R')  E  status IN ('CL','CLUNRSLV')
+--     E  group_id ATUAL = @COI_GrupoAlvo, que precisa existir, estar ativo e ter
+--     ao menos um membro em grpmem.
+--------------------------------------------------------------------------------
+DECLARE @GrupoNome     nvarchar(200);
+DECLARE @GrupoInativo  int;
+DECLARE @GrupoMembros  bigint;
+
+SELECT
+    @GrupoNome    = LTRIM(RTRIM(COALESCE(NULLIF(c.last_name, N''), NULLIF(c.userid, N''), N'(sem nome)'))),
+    @GrupoInativo = c.inactive
+FROM dbo.ca_contact AS c
+WHERE c.contact_uuid = @COI_GrupoAlvo;
+
+SELECT @GrupoMembros = COUNT_BIG(*)
+FROM dbo.grpmem AS gm
+WHERE gm.group_id = @COI_GrupoAlvo;
+
+DECLARE @GrupoAlvoValido bit =
+    CASE WHEN @GrupoNome IS NOT NULL AND @GrupoInativo = 0 AND @GrupoMembros > 0
+         THEN 1 ELSE 0 END;
+
+IF @GrupoAlvoValido = 0
+    PRINT N'ATENCAO: o grupo alvo NAO passa no filtro da Consulta para Auditoria '
+        + N'(precisa existir, estar com inactive = 0 e ter ao menos um membro em grpmem). '
+        + N'A serie Encerrados sera ZERO por causa disso, e nao por ausencia de encerramentos.';
+
+IF OBJECT_ID('tempdb..#EncerradosCOI') IS NOT NULL DROP TABLE #EncerradosCOI;
+
+SELECT
+    r.id,
+    r.ref_num AS SDM,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, r.close_date, @Epoch)) AS encerramento_br
+INTO #EncerradosCOI
+FROM dbo.call_req AS r
+WHERE r.close_date >= @InicioEpoch
+  AND r.close_date <  @FimEpoch
+  AND r.[type]   IN ('I', 'R')
+  AND r.status   IN ('CL', 'CLUNRSLV')
+  AND r.group_id = @COI_GrupoAlvo
+  AND @GrupoAlvoValido = 1
+OPTION (RECOMPILE);
+
+CREATE UNIQUE CLUSTERED INDEX IX_EncerradosCOI ON #EncerradosCOI(id);
+--------------------------------------------------------------------------------
+-- FIM REGRA OFICIAL DE ENCERRADOS COI
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- [C] CALENDARIO - todos os meses do periodo x as 24 horas, inclusive as de
+--     quantidade zero. Mesma construcao das consultas por hora de Registrados e
+--     de Encerrados: MesAno sai como AAAA-MM, que nao depende do idioma do
+--     servidor e ordena corretamente como texto.
 --------------------------------------------------------------------------------
 IF OBJECT_ID('tempdb..#Dias') IS NOT NULL DROP TABLE #Dias;
 
@@ -1273,7 +1330,47 @@ FROM sys.all_objects AS a;
 CREATE UNIQUE CLUSTERED INDEX IX_Horas ON #Horas(Hora);
 
 --------------------------------------------------------------------------------
--- RESULTADO - Registrados pelo COI por hora, consolidado por mes
+-- [A] AGREGACOES SEPARADAS - cada serie agregada sozinha por (Ano, Mes, Hora),
+--     antes de qualquer combinacao. O indice UNICO garante uma linha por celula
+--     em cada agregado, e por isso o LEFT JOIN do resultado nao multiplica nada.
+--
+--     Registrados: hora da DataRegistroCOI (#Registrados.registro_br).
+--     Encerrados:  hora do close_date     (#EncerradosCOI.encerramento_br).
+--------------------------------------------------------------------------------
+IF OBJECT_ID('tempdb..#PorHoraRegistrados') IS NOT NULL DROP TABLE #PorHoraRegistrados;
+
+SELECT
+    YEAR(r.registro_br)           AS Ano,
+    MONTH(r.registro_br)          AS Mes,
+    DATEPART(HOUR, r.registro_br) AS Hora,
+    COUNT(*)                      AS Qtd
+INTO #PorHoraRegistrados
+FROM #Registrados AS r
+GROUP BY
+    YEAR(r.registro_br),
+    MONTH(r.registro_br),
+    DATEPART(HOUR, r.registro_br);
+
+CREATE UNIQUE CLUSTERED INDEX IX_PorHoraRegistrados ON #PorHoraRegistrados(Ano, Mes, Hora);
+
+IF OBJECT_ID('tempdb..#PorHoraEncerrados') IS NOT NULL DROP TABLE #PorHoraEncerrados;
+
+SELECT
+    YEAR(e.encerramento_br)           AS Ano,
+    MONTH(e.encerramento_br)          AS Mes,
+    DATEPART(HOUR, e.encerramento_br) AS Hora,
+    COUNT(*)                          AS Qtd
+INTO #PorHoraEncerrados
+FROM #EncerradosCOI AS e
+GROUP BY
+    YEAR(e.encerramento_br),
+    MONTH(e.encerramento_br),
+    DATEPART(HOUR, e.encerramento_br);
+
+CREATE UNIQUE CLUSTERED INDEX IX_PorHoraEncerrados ON #PorHoraEncerrados(Ano, Mes, Hora);
+
+--------------------------------------------------------------------------------
+-- RESULTADO - Registrados e Encerrados pelo COI por hora, consolidado por mes
 --------------------------------------------------------------------------------
 SELECT
     m.Ano,
@@ -1281,16 +1378,18 @@ SELECT
     m.MesAno,
     h.Hora,
     CONVERT(char(3), CONCAT(RIGHT(CONCAT(N'0', h.Hora), 2), N'h')) AS HoraLabel,
-    ISNULL(agg.Qtd, 0) AS QtdRegistrados
+    ISNULL(pr.Qtd, 0) AS Registrados,
+    ISNULL(pe.Qtd, 0) AS Encerrados
 FROM #Meses AS m
 CROSS JOIN #Horas AS h
-OUTER APPLY (
-    SELECT COUNT(*) AS Qtd
-    FROM #Registrados AS r
-    WHERE YEAR(r.registro_br)           = m.Ano
-      AND MONTH(r.registro_br)          = m.Mes
-      AND DATEPART(HOUR, r.registro_br) = h.Hora
-) AS agg
+LEFT JOIN #PorHoraRegistrados AS pr
+    ON  pr.Ano  = m.Ano
+    AND pr.Mes  = m.Mes
+    AND pr.Hora = h.Hora
+LEFT JOIN #PorHoraEncerrados AS pe
+    ON  pe.Ano  = m.Ano
+    AND pe.Mes  = m.Mes
+    AND pe.Hora = h.Hora
 ORDER BY
     m.Ano,
     m.Mes,
