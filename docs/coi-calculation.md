@@ -20,9 +20,9 @@ referência funcional do COI.
 6. [Chamados Encerrados](#6-chamados-encerrados)
 7. [Registrados × Encerrados por dia](#7-registrados--encerrados-por-dia)
 8. [Registrados por mês](#8-registrados-por-mês)
-9. [Registrados por hora](#9-registrados-por-hora)
+9. [Por hora](#9-por-hora)
 10. [Registrados por evidência e detalhe](#10-registrados-por-evidência-e-detalhe)
-11. [Registrados por registrador](#11-registrados-por-registrador)
+11. [Por registrador e por membro](#11-por-registrador-e-por-membro)
 12. [Membros, contas técnicas e universo bruto](#12-membros-contas-técnicas-e-universo-bruto)
 13. [Validação](#13-validação)
 14. [Pesquisa de satisfação dos Encerrados](#14-pesquisa-de-satisfação-dos-encerrados)
@@ -36,17 +36,23 @@ referência funcional do COI.
 O COI não tem FAIA nem FARC. O que se mede é **volumetria**: quantos chamados
 entram no COI, quantos o COI encerra e em que horário os registros acontecem.
 
-São doze consultas, em três famílias:
+São quinze consultas, em três famílias:
 
 | Família | Consultas | Regra |
 |---|---|---|
-| **Registrados** | `mensal`, `encerrados_diario`, `por_hora`, `detalhe`, `por_registrador`, `por_evidencia`, `validacao` | Primeira entrada do chamado no COI — seções [3](#3-chamados-registrados) a [5](#5-automações) |
-| **Encerrados** | `consulta_coi_encerrados.sql`, `consulta_coi_pesquisa_satisfacao_encerrados.sql` e a série de encerrados do diário | Fechamento no grupo auditado — seção [6](#6-chamados-encerrados) |
+| **Registrados** | `mensal`, `encerrados_diario`, `por_hora`, `detalhe`, `por_registrador`, `por_evidencia`, `validacao` e a série de registrados de `registrados_encerrados_por_membro` | Primeira entrada do chamado no COI — seções [3](#3-chamados-registrados) a [5](#5-automações) |
+| **Encerrados** | `consulta_coi_encerrados.sql`, `encerrados_por_hora`, `pesquisa_satisfacao_encerrados`, `pesquisa_satisfacao_encerrados_detalhe` e as séries de encerrados do diário e do por membro | Fechamento no grupo auditado — seção [6](#6-chamados-encerrados) |
 | **Conciliação por abertura** | `membros`, `total_com_tecnicos`, `universo_bruto` | Chamados abertos por analistas do COI e por contas técnicas — seção [12](#12-membros-contas-técnicas-e-universo-bruto) |
 
-As sete consultas de Registrados aplicam **a mesma regra**, com o mesmo texto.
-O que muda entre elas é só a forma de agrupar e apresentar o resultado. Por isso
-os totais de uma batem com os das outras para o mesmo período.
+As oito consultas que contam Registrados aplicam **a mesma regra**, com o mesmo
+texto: as sete originais e a de Registrados × Encerrados por membro. O que muda
+entre elas é só a forma de agrupar e apresentar o resultado. Por isso os totais
+de uma batem com os das outras para o mesmo período. Da mesma forma, as
+consultas de Encerrados copiam literalmente a regra e a conferência do grupo
+alvo de `consulta_coi_encerrados.sql`.
+
+Sete delas alimentam o painel do Power BI; quais são, e por que as demais ficam
+só em `queries/`, está em `powerbi/powerbi-query.md`.
 
 Registrado e Encerrado são **indicadores diferentes**, com regras e datas
 diferentes.
@@ -60,9 +66,9 @@ Base `mdb` do CA Service Desk Manager, lida somente para leitura.
 | Tabela | Papel |
 |---|---|
 | `call_req` | O chamado: número (SDM), tipo, status, grupo atual, abertura, fechamento, resolução e quem o abriu |
-| `act_log` | Histórico de eventos. As transferências de grupo (eventos `TR`) e o registro de criação (evento `INIT`) |
+| `act_log` | Histórico de eventos. As transferências de grupo (eventos `TR`), o registro de criação (evento `INIT`), os eventos de fechamento e de solução (quem encerrou, seção [11](#11-por-registrador-e-por-membro)) e o pedido de pesquisa (`SRVY_SENT`, seção [14](#14-pesquisa-de-satisfação-dos-encerrados)) |
 | `ca_contact` | Cadastro de grupos e pessoas: identifica a fila do COI, as contas técnicas e os nomes |
-| `grpmem` | Composição dos grupos: confere se o grupo auditado em Encerrados tem membros |
+| `grpmem` | Composição dos grupos: confere se o grupo auditado em Encerrados tem membros e classifica as contas como membro do COI |
 | `cr_stat`, `prob_ctg`, `ca_owned_resource` | Nome do status, categoria e item de configuração, na listagem de Encerrados |
 | `survey`, `survey_question`, `survey_answer` | Pesquisa de satisfação: a pesquisa, as perguntas e a opção escolhida |
 | `sys.all_objects` | Catálogo do SQL Server, usado só para gerar a sequência de dias e horas dos calendários |
@@ -404,7 +410,9 @@ inclusive meses sem registro.
 
 ---
 
-## 9. Registrados por hora
+## 9. Por hora
+
+### Registrados por hora
 
 `queries/consulta_coi_registrados_por_hora.sql`. Mostra **em que hora do dia**
 os chamados entram no COI: é a distribuição pela **hora da `DataRegistroCOI`**,
@@ -424,6 +432,19 @@ em horário de Brasília.
 ```
 
 As 24 horas de um mês somam o `Total` daquele mês na consulta mensal.
+
+### Encerrados por hora
+
+`queries/consulta_coi_encerrados_por_hora.sql`. A mesma forma, para
+Encerrados: a população é a da seção [6](#6-chamados-encerrados), com a regra e
+a conferência do grupo alvo copiadas literalmente, e a hora é a da **data de
+fechamento**, em horário de Brasília — nunca a hora de registro.
+
+- 24 linhas por mês, inclusive as horas sem encerramento.
+- Colunas: `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel` e `QtdEncerrados`.
+- As 24 horas do período somam as linhas de `consulta_coi_encerrados.sql`.
+- Parâmetros: `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`. Com grupo alvo
+  inválido, o resultado sai vazio, como em Encerrados.
 
 ---
 
@@ -461,6 +482,7 @@ população de Registrados. É a prova nominal do total.
 | Grupo de colunas | Colunas |
 |---|---|
 | Identificação e data | `SDM`, `DataAbertura`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro` |
+| Descrição | `Categoria` (`prob_ctg.sym`, `N/A` sem categoria) e `Resumo` (`call_req.summary`), logo depois de `SDM` |
 | Como entrou | `FormaRegistroCOI`, `EvidenciaRegistroCOI`, `TipoAutomacaoCOI`, `AliasEvidencia` |
 | Tipo | `TipoCodigo`, `Tipo` |
 | Quem abriu | `RegistradorUUID`, `RegistradorUserID`, `RegistradorNome` |
@@ -541,7 +563,9 @@ registra no indicador: evidência `ABERTO_NO_COI_CADEIA`, datado na abertura.
 
 ---
 
-## 11. Registrados por registrador
+## 11. Por registrador e por membro
+
+### Registrados por registrador
 
 `queries/consulta_coi_registrados_por_registrador.sql` agrupa a população de
 Registrados por **quem abriu** o chamado (`log_agent`).
@@ -560,6 +584,66 @@ Registrados por **quem abriu** o chamado (`log_agent`).
 | `Solicitacoes`, `Incidentes`, `Total` | Registrados daquele registrador |
 | `Cadeia_AbertoNoCOI`, `Cadeia_JaEraCOIHistorico`, `Cadeia_Transferido`, `Cadeia_EntradaPorDestino`, `Fallback_GrupoAtual`, `Fallback_Historico`, `Automacao_TaskScheduler` | Quebra do `Total` por evidência; as sete somam o `Total` |
 | `InitContraditoPelaCadeia` | Quantos tiveram o `%GROUP=` do registro de criação contradito pela cadeia |
+
+### Registrados × Encerrados por membro
+
+`queries/consulta_coi_registrados_encerrados_por_membro.sql`. Uma linha por
+**mês e conta**, com quantos chamados a conta registrou e quantos encerrou no
+mês. As duas populações são as oficiais — Registrados pelo bloco canônico,
+Encerrados pela regra da seção [6](#6-chamados-encerrados) — e só a
+**atribuição** é nova:
+
+| Série | A quem se atribui | Mês |
+|---|---|---|
+| `Registrados` | Quem **abriu** o chamado (`log_agent`), como no por registrador | Da `DataRegistroCOI` |
+| `EncerradosComoResponsavel` | O **responsável** do chamado (`assignee`) — **critério do fornecedor, usado no painel** | Da data de fechamento |
+| `Encerrados` | Quem **executou o encerramento**: o autor do último evento `CL`, `ST`, `CLREQ`, `RE`, `RO` ou `SOLN` do histórico com instante até o fechamento; empate no mesmo segundo desfeito pelo maior `id`. Só auditoria | Da data de fechamento |
+
+**O indicador Por Membro segue o critério do fornecedor.** A tabela por analista
+do relatório do fornecedor atribui cada encerramento ao **responsável** do
+chamado, e é isso que `EncerradosComoResponsavel` faz. Conferido nos relatórios
+de março (09/03 a 31/03) e de junho de 2026: o responsável da consulta é o do
+relatório em todos os chamados comuns (471 de 471 e 612 de 612), e a contagem
+por analista reproduz a tabela do relatório, nome a nome. As únicas diferenças
+são de grafia do nome no relatório e os 5 chamados de março que a consulta conta
+e o relatório não (seção [6](#6-chamados-encerrados)).
+
+**Quem executou o encerramento não é, necessariamente, o responsável.** No SDM,
+o fechamento grava um evento `CL` no mesmo segundo do `close_date`, ou vem logo
+depois de uma solução (`SOLN`); o autor desse evento é quem executou o
+encerramento — muitas vezes a automação `Sesuc Automação`. De abril a setembro
+de 2026, o autor e o responsável diferem em 755 de 3.558 encerramentos (21%).
+Por isso `Encerrados` fica na consulta só para auditoria e comparação. As colunas
+`Encerrados` e `EncerradosComoResponsavel` são duas atribuições dos mesmos
+chamados: cada uma soma o total de Encerrados, e não se somam entre si.
+
+O histórico é usado **só para atribuir** um encerramento já contado. A
+população continua sendo a do grupo atual; não se volta à regra de Encerrados
+por grupo no momento do fechamento, abandonada no histórico do projeto. Nenhum
+texto de evento é interpretado.
+
+`TipoConta` classifica cada conta:
+
+| `TipoConta` | Critério |
+|---|---|
+| `Conta técnica / automação` | `usr_automacoes`, `sesuc_auto` ou userid/nome com `SERVICEDESK` / `SERVICE DESK` |
+| `Membro do grupo COI` | Consta hoje em `grpmem` de `@COI_Novo` ou de `@COI_Antigo` |
+| `Fora do grupo COI` | Pessoa que não é membro de nenhum dos dois grupos |
+| `Não identificado` | Encerramento sem responsável (`EncerradosComoResponsavel`) ou sem evento de fechamento ou de solução no histórico (`Encerrados`) |
+
+`TipoConta` é informativa e **não filtra** o indicador. `grpmem` guarda a
+composição **atual** dos dois grupos: quem saiu da equipe aparece como `Fora do
+grupo COI` também nos meses em que era membro, e analistas que o relatório do
+fornecedor lista no COI mas que não constam hoje de `grpmem` também aparecem
+como `Fora do grupo COI`. Pelo critério do responsável, nenhum encerramento cai
+em conta técnica.
+
+Colunas: `Ano`, `Mes`, `MesAno`, `MembroUUID`, `MembroUserID`, `Membro`,
+`TipoConta`, `Registrados`, `Encerrados`, `EncerradosComoResponsavel`. Uma conta
+aparece no mês se tiver ao menos um valor diferente de zero. Parâmetros:
+`@InicioBR`, `@FimBR`, `@COI_GrupoAlvo` e `@MostrarDiagnostico` — este, ligado,
+acrescenta um segundo resultado com cada encerramento, quem encerrou, o evento
+usado, os segundos até o fechamento e o responsável atual.
 
 ---
 
@@ -697,7 +781,10 @@ cadeia. Vazio quando nada foi excluído.
 
 ## 14. Pesquisa de satisfação dos Encerrados
 
-`queries/consulta_coi_pesquisa_satisfacao_encerrados.sql`.
+`queries/consulta_coi_pesquisa_satisfacao_encerrados.sql` e, para o painel,
+`queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql` (ver
+[Detalhe por chamado](#detalhe-por-chamado)). As duas têm a mesma população e
+a mesma classificação.
 
 ### População
 
@@ -754,6 +841,24 @@ Por isso um chamado pode estar *Com satisfação* na Janela 1 e não aparecer na
 Janela 2, se a pergunta considerada ficou em branco. A conferência mede essa
 diferença.
 
+### Detalhe por chamado
+
+`queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql` devolve
+**uma linha por chamado encerrado**, com data, para que o filtro de mês do
+painel funcione. A classificação é a das duas janelas acima, na mesma linha:
+
+| Coluna | Conteúdo |
+|---|---|
+| `SDM`, `TipoChamado`, `DataEncerramento`, `Ano`, `Mes`, `MesAno` | O encerramento |
+| `StatusSatisfacao` | `Com satisfação` ou `Sem satisfação`, como na Janela 1 |
+| `PerguntaAvaliada`, `RespostaSatisfacao` | A pergunta considerada e a opção escolhida, como na Janela 2 |
+| `QtdPerguntasRespondidas`, `DataPesquisa` | Perguntas respondidas e última modificação da pesquisa considerada |
+| `PesquisaSolicitada`, `QtdSolicitacoesPesquisa`, `DataSolicitacaoPesquisa`, `SolicitacaoPesquisa` | Se o SDM registrou o pedido de pesquisa (evento `SRVY_SENT` do histórico), quantas vezes, e o mais recente |
+
+**Solicitada não é respondida.** O pedido de pesquisa é registrado para a
+maioria dos encerramentos (2.550 de 4.036, de março a setembro de 2026), mas só
+2 têm resposta. A regra do COI conta as **respondidas** (`StatusSatisfacao`).
+
 ### Resultado esperado: quase tudo "Sem satisfação"
 
 O envio de pesquisa **não está habilitado** para as filas do COI; as pesquisas
@@ -774,8 +879,11 @@ do dia.
 |---|---|
 | Registrados — as sete consultas | `@InicioBR`, `@FimBR` |
 | Registrados × Encerrados por dia | `@InicioBR`, `@FimBR`, `@COI_GrupoAlvo` |
+| Registrados × Encerrados por membro | `@InicioBR`, `@FimBR`, `@COI_GrupoAlvo`, `@MostrarDiagnostico` |
 | Encerrados | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@MostrarDiagnostico` |
+| Encerrados por hora | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo` |
 | Pesquisa de satisfação | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@SequenciaPerguntaAvaliada` (padrão `40`), `@MostrarConferencia` |
+| Pesquisa de satisfação, detalhe | `@DataInicio`, `@DataFim`, `@COI_GrupoAlvo`, `@SequenciaPerguntaAvaliada` (padrão `40`) |
 | Membros, contas técnicas, universo bruto | Tabela de períodos e lista de analistas no início de cada arquivo |
 
 `@COI_GrupoAlvo` escolhe **um** grupo, `@COI_Novo` ou `@COI_Antigo`, junto com o
@@ -815,3 +923,5 @@ alterados para mudar o período:
   transcrita.
 - **Satisfação** depende do envio de pesquisa, hoje não habilitado para as filas
   do COI.
+- **Membro do COI é a composição atual.** A classificação `TipoConta` do por
+  membro usa `grpmem` de hoje, sem histórico de entrada e saída da equipe.

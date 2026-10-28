@@ -10,23 +10,26 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 
 ```text
 .
-├── queries/
-│   ├── consulta_coi_encerrados.sql
+├── queries/                                  15 consultas de referência (fonte de verdade)
+│   ├── consulta_coi_encerrados.sql                               painel
+│   ├── consulta_coi_encerrados_por_hora.sql                      painel
 │   ├── consulta_coi_pesquisa_satisfacao_encerrados.sql
-│   ├── consulta_coi_registrados_detalhe.sql
-│   ├── consulta_coi_registrados_encerrados_diario.sql
+│   ├── consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql   painel
+│   ├── consulta_coi_registrados_detalhe.sql                      painel
+│   ├── consulta_coi_registrados_encerrados_diario.sql            painel
+│   ├── consulta_coi_registrados_encerrados_por_membro.sql        painel
 │   ├── consulta_coi_registrados_membros.sql
 │   ├── consulta_coi_registrados_mensal.sql
 │   ├── consulta_coi_registrados_por_evidencia.sql
-│   ├── consulta_coi_registrados_por_hora.sql
+│   ├── consulta_coi_registrados_por_hora.sql                     painel
 │   ├── consulta_coi_registrados_por_registrador.sql
 │   ├── consulta_coi_registrados_total_com_tecnicos.sql
 │   ├── consulta_coi_registrados_universo_bruto.sql
 │   └── consulta_coi_registrados_validacao.sql
 ├── powerbi/
-│   ├── <consulta de queries/>_power_bi.sql   12 arquivos: a consulta do Power BI de cada relatório (uma por relatório)
+│   ├── <consulta de queries/>_power_bi.sql   7 arquivos: as consultas marcadas painel acima
 │   ├── powerbi-query.md                   documentação das consultas do Power BI
-│   └── documentacao-powerbi-coi.html      versão resumida para o Power BI
+│   └── documentacao-powerbi-coi.html      conteúdo da página Documentação do painel
 ├── docs/
 │   └── coi-calculation.md                 regras de cálculo, a partir de queries/
 ├── project-context/
@@ -52,21 +55,22 @@ A regra de negócio é construída a partir do histórico de fila, do tipo de ch
 
 O bloco de consultas de registrados responde à pergunta: **quais chamados efetivamente entraram na base do COI no período**.
 
-Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As sete consultas e as suas sete versões do Power BI compartilham um **bloco canônico** idêntico, conferido por SHA256. A regra está descrita em [`docs/coi-calculation.md`](docs/coi-calculation.md); a precedência e o hash vigente estão no Histórico Mestre.
+Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo, histórico, fallback de grupo atual) **ou** por registro da automação oficial Task Scheduler / SESUC, que registra direto na fila do NSTI ou do fornecedor. As oito consultas que contam Registrados (as sete abaixo e a de Registrados × Encerrados por membro) e as quatro versões do Power BI que as usam compartilham um **bloco canônico** idêntico, conferido por SHA256. A regra está descrita em [`docs/coi-calculation.md`](docs/coi-calculation.md); a precedência e o hash vigente estão no Histórico Mestre.
 
-**Indicadores** — o que alimenta gráfico e painel:
+**Indicadores**:
 
 | Arquivo | Indicador | Saída |
 |---|---|---|
 | [`queries/consulta_coi_registrados_mensal.sql`](queries/consulta_coi_registrados_mensal.sql) | Registrados por mês, separando Incidentes e Solicitações | `Ano, Mes, MesAno, Incidentes, Solicitacoes, Total` |
 | [`queries/consulta_coi_registrados_encerrados_diario.sql`](queries/consulta_coi_registrados_encerrados_diario.sql) | Registrados × Encerrados por dia (I e R juntos) | `Dia, Registrados, Encerrados` |
 | [`queries/consulta_coi_registrados_por_hora.sql`](queries/consulta_coi_registrados_por_hora.sql) | Registrados por hora, dias consolidados | `Ano, Mes, MesAno, Hora, HoraLabel, QtdRegistrados` |
+| [`queries/consulta_coi_registrados_encerrados_por_membro.sql`](queries/consulta_coi_registrados_encerrados_por_membro.sql) | Registrados (por quem abriu) e Encerrados de cada conta, por mês. O painel usa `EncerradosComoResponsavel` — o responsável pelo chamado, critério do fornecedor; `Encerrados` (quem executou o encerramento) fica para auditoria | `Ano, Mes, MesAno, MembroUUID, MembroUserID, Membro, TipoConta, Registrados, Encerrados, EncerradosComoResponsavel` |
 
 **Auditoria** — a mesma população, por outros ângulos, para provar o número:
 
 | Arquivo | Para que serve |
 |---|---|
-| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
+| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: categoria, resumo, data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
 | [`queries/consulta_coi_registrados_por_registrador.sql`](queries/consulta_coi_registrados_por_registrador.sql) | A mesma população agrupada por quem registrou (`log_agent`) |
 | [`queries/consulta_coi_registrados_por_evidencia.sql`](queries/consulta_coi_registrados_por_evidencia.sql) | Composição do total por classe de evidência |
 | [`queries/consulta_coi_registrados_validacao.sql`](queries/consulta_coi_registrados_validacao.sql) | Uma linha de sanidade com validações automáticas |
@@ -84,11 +88,33 @@ A regra é a seguinte: um chamado é considerado encerrado pelo COI quando:
 
 O período é parametrizável, com intervalo semiaberto (`>= início` e `< fim`), e a identidade do grupo é definida por UUID, não por nome.
 
+Com a mesma população e a mesma conferência do grupo alvo:
+
+| Arquivo | Para que serve |
+|---|---|
+| [`queries/consulta_coi_encerrados_por_hora.sql`](queries/consulta_coi_encerrados_por_hora.sql) | Encerrados por hora do fechamento, 24 horas por mês: `Ano, Mes, MesAno, Hora, HoraLabel, QtdEncerrados` |
+| [`queries/consulta_coi_pesquisa_satisfacao_encerrados.sql`](queries/consulta_coi_pesquisa_satisfacao_encerrados.sql) | Pesquisa de satisfação: resumo (Janela 1), respostas (Janela 2) e conferência |
+| [`queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql`](queries/consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql) | A mesma classificação, uma linha por chamado encerrado, com data e o pedido de pesquisa registrado no SDM |
+
 ### Painel
 
-A pasta `powerbi/` tem uma versão para cada uma das 12 consultas de `queries/`, com o mesmo nome acrescido de `_power_bi`. Cada uma aplica a mesma regra da sua referência, com período automático e saída num único resultado.
+O painel tem sete páginas: **Início** (navegação), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**.
 
-A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). Uma versão resumida, para o visual HTML Content do Power BI, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
+A pasta `powerbi/` tem **só as 7 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
+
+| Consulta do Power BI | Páginas |
+|---|---|
+| `consulta_coi_registrados_detalhe_power_bi.sql` | Visão Geral, Por Tipo |
+| `consulta_coi_encerrados_power_bi.sql` | Visão Geral, Por Tipo |
+| `consulta_coi_registrados_encerrados_diario_power_bi.sql` | Visão Geral |
+| `consulta_coi_registrados_por_hora_power_bi.sql` | Por Hora |
+| `consulta_coi_encerrados_por_hora_power_bi.sql` | Por Hora |
+| `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | Por Membro |
+| `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | Satisfação |
+
+Cada uma aplica a mesma regra da sua referência, com período automático (meses completos, até 12, a partir de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto e o resumo da satisfação — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
+
+A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). O conteúdo da página Documentação, para o visual HTML Content, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
 
 ## Consultas de apoio
 
@@ -119,10 +145,10 @@ Os nomes variam por família de consulta:
 
 | Consultas | Início (inclusivo) | Fim (exclusivo) | Conferência |
 |---|---|---|---|
-| Registrados (`consulta_coi_registrados_*.sql`) | `@InicioBR` | `@FimBR` | — |
-| Encerrados | `@DataInicio` | `@DataFim` | `@MostrarDiagnostico` |
-| Pesquisa de satisfação dos encerrados | `@DataInicio` | `@DataFim` | `@MostrarConferencia` |
-| Power BI (`powerbi/*_power_bi.sql`) | automático, por `@PBI_QuantidadeMeses`; fixo em membros, contas técnicas e universo bruto | automático; fixo nas mesmas três | as da referência |
+| Registrados (`consulta_coi_registrados_*.sql`) | `@InicioBR` | `@FimBR` | `@MostrarDiagnostico` no por membro |
+| Encerrados e Encerrados por hora | `@DataInicio` | `@DataFim` | `@MostrarDiagnostico` em Encerrados |
+| Pesquisa de satisfação dos encerrados (resumo e detalhe) | `@DataInicio` | `@DataFim` | `@MostrarConferencia` no resumo |
+| Power BI (`powerbi/*_power_bi.sql`) | automático: `@PBI_QuantidadeMeses` (12) meses antes do fim, nunca antes de `@PBI_InicioMinimoBR` (01/03/2026) | dia 1 do mês corrente | as da referência |
 
 - Todas as datas são horário do Brasil (GMT-3) e o intervalo é **semiaberto**: `>= início` e `< fim`. Para março inteiro, use início `2026-03-01 00:00:00` e fim `2026-04-01 00:00:00` — nunca `23:59:59`.
 - `@TransIniBR` e `@TransFimBR`, dentro do bloco canônico, marcam a janela da renomeação das filas do COI em 18/03/2026. **Não são parâmetros de período** e não devem ser alterados.
@@ -140,7 +166,7 @@ As consultas de auditoria servem para confirmar a população e validar se os to
 ## Convenções do projeto
 
 - `queries/`: consultas executáveis relacionadas ao COI.
-- `powerbi/`: consultas de painel e consolidação.
+- `powerbi/`: só as consultas que o painel usa, e a sua documentação.
 - `support/`: consultas auxiliares.
 - `project-context/`: Histórico Mestre do COI.
 

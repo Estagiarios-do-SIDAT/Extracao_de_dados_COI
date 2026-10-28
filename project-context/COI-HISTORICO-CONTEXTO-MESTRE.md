@@ -25043,3 +25043,181 @@ e `REGRA COMPARTILHADA TECNICOS COI`
 mudaram. Como o texto SQL é o mesmo já validado em `7c643f9` (e as saídas
 antigas foram registradas na §73: mesmas linhas e valores), o resultado das
 consultas é o do baseline.
+
+## 75. 2026-10-28 — painel de 7 páginas: `powerbi/` reduzida às 7 consultas usadas, três consultas novas em `queries/`, Por Membro pelo critério do fornecedor
+
+Nenhuma regra de Registrados ou de Encerrados mudou. As populações são as de
+sempre; o que entra é **agregação e atribuição** novas, em consultas novas, e a
+pasta `powerbi/` passa a ter só o que o painel usa.
+
+### 75.1. O painel
+
+Sete páginas: Início (navegação), Visão Geral, Por Hora, Por Membro, Por Tipo,
+Satisfação e Documentação (conteúdo de `powerbi/documentacao-powerbi-coi.html`).
+Filtro Mês/Ano único nas cinco analíticas; só meses completos; sem controle de
+6 meses / 1 ano / 2 anos. Páginas, medidas e modelo não fazem parte desta
+intervenção (nenhum `.pbix` foi tocado).
+
+### 75.2. `powerbi/` e período
+
+Ficam 7 consultas, todas geradas da referência em `queries/` com as adaptações
+marcadas `[POWER BI]`:
+
+| Consulta do Power BI | Páginas | Situação |
+|---|---|---|
+| `registrados_detalhe` | Visão Geral, Por Tipo | mantida |
+| `encerrados` | Visão Geral, Por Tipo | mantida |
+| `registrados_encerrados_diario` | Visão Geral | mantida (`@COI_Novo`, como antes) |
+| `registrados_por_hora` | Por Hora | mantida |
+| `encerrados_por_hora` | Por Hora | **nova** |
+| `registrados_encerrados_por_membro` | Por Membro | **nova** |
+| `pesquisa_satisfacao_encerrados_detalhe` | Satisfação | **nova** |
+
+Saíram de `powerbi/` (as referências continuam em `queries/`): `mensal`,
+`por_evidencia`, `por_registrador`, `validacao`, `membros`,
+`total_com_tecnicos`, `universo_bruto` e `pesquisa_satisfacao_encerrados`. Com
+isso some a saída empilhada (`TipoResultado`) e o período fixo das três de
+conciliação: as 7 devolvem um único resultado.
+
+**Período.** Antes, 6 meses completos. Agora até **12 meses completos**
+(`@PBI_QuantidadeMeses = 12`), nunca antes de **01/03/2026**
+(`@PBI_InicioMinimoBR`): março de 2026 é o mês em que o novo COI passou a usar o
+código de fornecedor atual (`@COI_Novo`, o grupo alvo de Encerrados) e entra
+inteiro. Em outubro de 2026 o painel cobre março a setembro de 2026; a janela
+cresce até 12 meses e depois anda mês a mês. Antes de março, os encerramentos
+são do grupo antigo, que a regra não soma (§62).
+
+**Março é mês de transição.** Os dois grupos encerraram em março: o antigo até
+24/03 (fora da regra, outro contrato); `@COI_Novo` a partir de 08/03 — 478 no
+mês, 2 em 08/03 e 476 de 09/03 a 31/03, o período do RSP de março (§62.8: 476 ×
+471, cinco divergentes nomeados).
+
+### 75.3. Consultas novas
+
+- **`consulta_coi_encerrados_por_hora.sql`** — regra e conferência do grupo
+  alvo de `consulta_coi_encerrados.sql` copiadas literalmente; hora do
+  `close_date` em horário de Brasília; 24 linhas por mês com zeros.
+- **`consulta_coi_registrados_encerrados_por_membro.sql`** — bloco canônico
+  copiado literalmente (oitavo consumidor; o comentário interno do bloco ainda
+  diz "sete", mantido para não mudar o hash) e regra oficial de Encerrados.
+  Atribuição de Registrados: `log_agent`. Encerrados em duas colunas:
+  - `EncerradosComoResponsavel` — o **responsável** (`assignee`), critério da
+    tabela por analista do fornecedor e da `Consulta para Auditoria` (§56/§62).
+    **É a série do indicador**: a página Por Membro usa esta coluna, com o
+    rótulo "Encerrados";
+  - `Encerrados` — quem **executou** o encerramento: autor do último evento
+    `CL`/`ST`/`CLREQ`/`RE`/`RO`/`SOLN` com `system_time <= close_date`,
+    `ORDER BY system_time DESC, id DESC`. Só auditoria e comparação.
+
+  As duas somam o mesmo total e nunca se somam entre si. `TipoConta`: conta
+  técnica (`usr_automacoes`, `sesuc_auto`, SERVICEDESK / SERVICE DESK), membro
+  (`grpmem` atual de `@COI_Novo` ou `@COI_Antigo`), fora do grupo, não
+  identificado. É informativa e não filtra o indicador.
+- **`consulta_coi_pesquisa_satisfacao_encerrados_detalhe.sql`** — mesma
+  população e mesma classificação da consulta de satisfação (Janela 1 e
+  Janela 2 na mesma linha), uma linha por encerrado, com data; e o pedido de
+  pesquisa registrado no SDM (`act_log.type = 'SRVY_SENT'`). Solicitada não é
+  respondida: a regra do COI conta as respondidas.
+
+**O que não foi reintroduzido.** A §62 tirou o `act_log` da **regra** de
+Encerrados (grupo no encerramento) e, com ela, a coluna "Analista do Evento
+Terminal". `consulta_coi_encerrados.sql` não mudou e continua sem `act_log`. Na
+consulta por membro, o histórico só **atribui**, na coluna de auditoria, um
+encerramento já contado pela regra do grupo atual; não decide população, não
+reconstrói grupo e não interpreta texto de evento.
+
+### 75.4. Por Membro × relatório do fornecedor
+
+Conferido contra os RSP de **09/03 a 31/03/2026** e de **junho/2026**
+(`Documentos e Relatórios/COI`), abas de encerrados (I + R, com `Responsável`)
+e tabela por analista da aba `DADOS`:
+
+| | Março (09–31) | Junho |
+|---|---:|---:|
+| Encerrados RSP (abas = `DADOS`) | 471 | 612 |
+| Encerrados da consulta | 476 | 612 |
+| SDMs só na consulta | 5 (os da §62.8) | 0 |
+| Responsável RSP = `assignee` da consulta | 471 de 471 | 612 de 612 |
+| Responsável RSP = quem executou o encerramento | 408 de 471 | 447 de 612 |
+| Nomes iguais `DADOS` × `EncerradosComoResponsavel` | todos, salvo grafia e os 5 | todos, salvo grafia |
+
+Diferenças restantes: grafias do nome no RSP (`Bruno Roberto Costa Oliveira`,
+`Lucas dos Santos Amaral`, `Vinicius de Morais Cardoso Tinoco`, `Julio Cesar
+de Lacerda Jr.`) e, em março, os 5 SDMs da §62.8 (Elton +1, Luan +1, Francisco
++2, um sem responsável). Pelo critério de quem executou, `Sesuc Automação`
+receberia 57 encerramentos em março e 159 em junho, que o fornecedor atribui
+aos analistas. Pelo critério do responsável, nenhum encerramento cai em conta
+técnica.
+
+Analistas que o RSP lista no COI (Gabriel Moraes, Jean Pires, Marcella Brito,
+Marcelo Avelino, Pedro Rafael, George Mota, Marco Aurélio) aparecem como `Fora
+do grupo COI`, porque não constam hoje de `grpmem` dos dois grupos — limitação
+já registrada da classificação, sem efeito na contagem.
+
+### 75.5. Commit `b4a64c2` (vitinho455, 07/10/2026) — `Categoria` e `Resumo` no detalhe de Registrados
+
+O commit reincluiu, só em `queries/consulta_coi_registrados_detalhe.sql`, as
+duas colunas que a §74 havia tirado: `Categoria` (`prob_ctg.sym` por
+`call_req.category = prob_ctg.persid`, `N/A` sem categoria) e `Resumo`
+(`call_req.summary`), logo depois de `SDM`, por dois `LEFT JOIN` fora do bloco
+canônico. Como a versão do Power BI é o texto da referência, ela passa a ter as
+duas colunas: **esta seção supersede a §74 apenas quanto a `Categoria` e
+`Resumo` no detalhe de Registrados**; as demais consultas seguem o schema da
+§74.
+
+Testes no SQL Server (março a setembro de 2026, 25.727 chamados):
+
+| Teste | Resultado |
+|---|---|
+| `prob_ctg.persid` e `call_req.id` únicos (a junção não duplica) | 0 duplicados; linhas = SDMs distintos |
+| Categoria resolvida | todas; dos 61.949 chamados I/R abertos desde fevereiro de 2026, 35 não têm categoria e sairiam `N/A` — nenhum deles entra em Registrados no período |
+| `Categoria` × `Símbolo` de Encerrados, 4.026 SDMs comuns | iguais em todos |
+| `Resumo` × `Resumo` de Encerrados | iguais em todos |
+| `summary`: tipo e tamanho | `nvarchar(255)`, máximo 255; o `CONVERT(nvarchar(4000))` não truncava |
+| Bloco canônico | inalterado |
+
+Corrigido, sem mudar resultado: `Resumo` passa a usar
+`LTRIM(RTRIM(ISNULL(cr.summary, N'')))`, a definição de Encerrados e da §73 —
+sem isso, um resumo nulo sairia `NULL` no detalhe e vazio em Encerrados (0 casos
+hoje); o comentário que citava `decision/queries/consulta_faia_farc.sql` passa a
+citar a definição de Encerrados do próprio COI; o cabeçalho `Saida:` listava
+nomes de colunas antigos (anteriores ao commit) e foi refeito com as 29 colunas
+reais; o arquivo volta a terminar em quebra de linha. O período padrão da
+referência (outubro de 2026) foi mantido: é só exemplo, o Power BI calcula o
+seu.
+
+### 75.6. Validação no SQL Server (`bdados-14r`, `mdb`, março a setembro de 2026)
+
+| Conferência | Resultado |
+|---|---|
+| Registrados: detalhe = diário = por hora = por membro | 25.727 em todos; mês a mês 4.342, 3.680, 3.422, 3.483, 3.398, 3.679, 3.723 |
+| Março × §70 | 4.342 (I 918, R 3.424) e as 7 evidências idênticas às da §70; abril a agosto também iguais aos da §70 |
+| Encerrados: encerrados = diário = por hora = por membro (as duas colunas) = satisfação | 4.036 em todos; mês a mês 478, 728, 593, 612, 583, 589, 453 |
+| Tipos | Registrados: Solicitação 20.823 + Incidente 4.904. Encerrados: Solicitação 3.348 + Incidente 688 |
+| Calendário | 214 dias no diário; 24 horas por mês nas duas consultas por hora |
+| Duplicidade | linhas = SDMs distintos nos detalhes; uma linha por mês e conta no por membro (1.116) |
+| `EncerradosComoResponsavel` por `TipoConta` | membro 2.961, fora 1.074, técnica 0, sem responsável 1 |
+| Satisfação | 2 respondidas (1719286 Bom, 1725655 Ótimo); 2.550 com pedido registrado |
+| Abril a setembro × rodada anterior | diário, por hora (as duas) e por membro idênticos; no detalhe, só `AbertoAntesDoPeriodo` muda em 5 chamados abertos em março, como esperado |
+| Power BI × referência | iguais linha a linha nas 7 (abril a setembro); o texto difere só nas linhas `[POWER BI]` |
+
+Bloco `REGRA CANONICA DE REGISTRADOS COI`:
+`e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc`, 12/12
+cópias (8 em `queries/`, 4 em `powerbi/`), igual ao HEAD.
+
+### 75.7. Auditoria de regressão
+
+Comparado com `b4a64c2`: nas consultas mantidas, o SQL executável do Power BI
+muda só no período; em `queries/`, só o detalhe de Registrados muda (75.5). A
+regra de Registrados (hash), a de Encerrados (texto de `consulta_coi_encerrados.sql`
+intacto), a atribuição de Registrados por `log_agent` (por membro = por
+registrador em março, conta a conta), a satisfação (detalhe = Janelas 1 e 2 da
+consulta original) e as correções das §62 a §74 continuam valendo. Nenhuma
+regressão encontrada.
+
+### 75.8. Documentação
+
+`README.md`, `docs/coi-calculation.md` (§1, §2, §9 Por hora, §10 detalhe, §11 Por
+registrador e por membro, §14, §15, §16), `powerbi/powerbi-query.md` (reescrito
+para as 7 consultas e 7 páginas) e `powerbi/documentacao-powerbi-coi.html`
+(conteúdo da página Documentação).

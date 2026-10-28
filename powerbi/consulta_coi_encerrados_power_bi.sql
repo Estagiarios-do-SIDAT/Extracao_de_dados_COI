@@ -9,8 +9,9 @@ SET NOCOUNT ON;
 -- corpo com [POWER BI]. Se esta versao e a fonte divergirem, vale a fonte.
 --
 -- Adaptacoes:
---   - periodo automatico: os @PBI_QuantidadeMeses meses de calendario COMPLETOS
---     anteriores ao mes corrente, no lugar das datas digitadas;
+--   - periodo automatico: os meses de calendario COMPLETOS anteriores ao mes
+--     corrente - ate @PBI_QuantidadeMeses, a partir de @PBI_InicioMinimoBR -,
+--     no lugar das datas digitadas;
 --   - saida: a fonte ja devolve um unico result set, que sai sem alteracao.
 --
 -- Power BI: conector SQL Server, banco mdb, modo Importacao, este arquivo
@@ -25,19 +26,31 @@ SET NOCOUNT ON;
 -- Aqui ele e calculado a cada atualizacao, na mesma forma:
 --
 --     fim    (exclusivo) = dia 1 do mes corrente, 00:00:00, horario do Brasil
---     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim
+--     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim, mas nunca
+--                          antes de @PBI_InicioMinimoBR
 --
--- Entram so meses COMPLETOS: o mes em andamento fica de fora. Para mudar a
--- cobertura, altere apenas @PBI_QuantidadeMeses.
+-- Entram so meses COMPLETOS: o mes em andamento fica de fora. As consultas do
+-- painel usam todas este MESMO periodo, para que o filtro Mes/Ano enxergue os
+-- mesmos meses em todas as paginas.
+--
+-- @PBI_InicioMinimoBR = 01/03/2026: mes em que o novo COI passou a usar o
+-- codigo de fornecedor atual, o grupo alvo de Encerrados (@COI_Novo). Marco
+-- entra INTEIRO. Antes dele, os encerramentos sao do grupo antigo - outro
+-- contrato, que a regra de Encerrados nao soma -, e o painel mostraria meses
+-- sem Encerrados ao lado de meses com Registrados. Para mudar a cobertura,
+-- altere apenas @PBI_QuantidadeMeses; o piso so muda se mudar o grupo alvo.
 --------------------------------------------------------------------------------
-DECLARE @PBI_QuantidadeMeses int = 6;
+DECLARE @PBI_QuantidadeMeses int = 12;
+DECLARE @PBI_InicioMinimoBR datetime2(0) = '2026-03-01 00:00:00';
 
 DECLARE @PBI_HojeBR date =
     CONVERT(date, DATEADD(HOUR, -3, SYSUTCDATETIME()));
 DECLARE @PBI_FimBR datetime2(0) =
     CONVERT(datetime2(0), DATEFROMPARTS(YEAR(@PBI_HojeBR), MONTH(@PBI_HojeBR), 1));
 DECLARE @PBI_InicioBR datetime2(0) =
-    DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR);
+    CASE WHEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR) > @PBI_InicioMinimoBR
+         THEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR)
+         ELSE @PBI_InicioMinimoBR END;
 
 
 /*

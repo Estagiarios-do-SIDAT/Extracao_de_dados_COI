@@ -1,94 +1,118 @@
 USE mdb;
 SET NOCOUNT ON;
 
---------------------------------------------------------------------------------
--- VERSAO POWER BI de queries/consulta_coi_registrados_mensal.sql
---
--- A regra e a da consulta de /queries, que e a fonte de verdade. Este arquivo
--- e o texto dela sem alteracao, exceto pelas adaptacoes abaixo, marcadas no
--- corpo com [POWER BI]. Se esta versao e a fonte divergirem, vale a fonte.
---
--- Adaptacoes:
---   - periodo automatico: os @PBI_QuantidadeMeses meses de calendario COMPLETOS
---     anteriores ao mes corrente, no lugar das datas digitadas;
---   - saida: a fonte ja devolve um unico result set, que sai sem alteracao.
---
--- Power BI: conector SQL Server, banco mdb, modo Importacao, este arquivo
--- inteiro no campo Instrucao SQL, Adicionar colunas de relacao desmarcado.
--- Somente leitura. Batch unico, sem GO.
---------------------------------------------------------------------------------
-
---------------------------------------------------------------------------------
--- [POWER BI] PERIODO AUTOMATICO
---
--- A fonte recebe o periodo digitado, em meses de calendario com fim EXCLUSIVO.
--- Aqui ele e calculado a cada atualizacao, na mesma forma:
---
---     fim    (exclusivo) = dia 1 do mes corrente, 00:00:00, horario do Brasil
---     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim
---
--- Entram so meses COMPLETOS: o mes em andamento fica de fora. Para mudar a
--- cobertura, altere apenas @PBI_QuantidadeMeses.
---------------------------------------------------------------------------------
-DECLARE @PBI_QuantidadeMeses int = 6;
-
-DECLARE @PBI_HojeBR date =
-    CONVERT(date, DATEADD(HOUR, -3, SYSUTCDATETIME()));
-DECLARE @PBI_FimBR datetime2(0) =
-    CONVERT(datetime2(0), DATEFROMPARTS(YEAR(@PBI_HojeBR), MONTH(@PBI_HojeBR), 1));
-DECLARE @PBI_InicioBR datetime2(0) =
-    DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR);
-
-
 /*
 ================================================================================
-COI - Chamados REGISTRADOS por mes (Incidentes x Solicitacoes)
+COI - REGISTRADOS x ENCERRADOS pelo COI, por MEMBRO e por mes
 ================================================================================
 
-Indicador: Grafico 1 - Chamados Registrados pelo COI, por mes, separando I e R.
+Para cada mes do periodo e cada pessoa ou conta, quantos chamados ela
+REGISTROU e quantos ela ENCERROU - as duas series lado a lado, com a
+classificacao da conta (membro do grupo COI, pessoa fora do grupo, conta
+tecnica/automacao).
 
 Saida: UM unico result set.
-    Ano, Mes, MesAno, Incidentes, Solicitacoes, Total
+    Ano, Mes, MesAno, MembroUUID, MembroUserID, Membro, TipoConta,
+    Registrados, Encerrados, EncerradosComoResponsavel
 
-REGRA DE "REGISTRADO PELO COI" - canonica, baseada no sistema fonte
+    Uma linha por (mes, conta) com ao menos um registro ou um encerramento.
+    Com @MostrarDiagnostico = 1, um segundo result set lista, chamado a
+    chamado, a quem cada encerramento foi atribuido e por qual evento.
 
-    type IN ('I','R')
-    E  PRIMEIRA ENTRADA NA FILA DO COI, em toda a vida do chamado, caindo
-       dentro da janela consultada
-    -> uma linha por SDM, sem filtro de analista, categoria, motivo ou status.
+AS DUAS SERIES SAO CALCULADAS SEPARADAMENTE, cada uma com a sua regra e a sua
+data - exatamente como em consulta_coi_registrados_encerrados_diario.sql, da
+qual esta consulta e a contrapartida "por membro":
 
-    O eixo NAO e call_req.open_date: e a DataRegistroCOI reconstruida. Um SDM
-    conta UMA vez, na primeira entrada; reentrada nao conta de novo.
+    Registrados  populacao: regra canonica de Registrados (bloco abaixo,
+                 IDENTICO byte a byte ao das consultas de Registrados).
+                 Data: DataRegistroCOI.
+                 Atribuicao: quem REGISTROU = call_req.log_agent (o campo
+                 "Relatado por"), a mesma definicao de RegistradorUUID no
+                 detalhe e de consulta_coi_registrados_por_registrador.sql.
+                 Num chamado TRANSFERIDO para o COI, quem abriu e de outra fila;
+                 por isso a coluna TipoConta existe.
 
-    A evidencia PRINCIPAL e a cadeia real de mudancas de grupo em act_log. O
-    '%GROUP=' do INIT e apenas AUXILIAR - ha chamados cujo INIT declara uma fila
-    que a primeira mudanca de grupo contradiz, e nesses a cadeia vence. Quando
-    nao existe NENHUM evento de grupo, aplica-se o fallback de estado autorizado
-    pela gestao do COI: a fila em que o chamado permaneceu.
+    Encerrados   populacao: regra oficial de Encerrados, LITERALMENTE a de
+                 consulta_coi_encerrados.sql (close_date no periodo, I/R,
+                 CL/CLUNRSLV, grupo ATUAL = @COI_GrupoAlvo valido).
+                 Data: close_date.
+                 Atribuicao: duas, nas duas colunas abaixo - pelo RESPONSAVEL
+                 (EncerradosComoResponsavel, o indicador) e por quem
+                 EXECUTOU o encerramento (Encerrados, auditoria).
 
-    O detalhamento, os aliases historicos, a janela de transicao de contrato e o
-    motivo de cada decisao estao no bloco delimitado por INICIO/FIM REGRA
-    CANONICA DE REGISTRADOS COI, IDENTICO byte a byte nas SETE consultas de
-    Registrados e conferivel por SHA256.
+    EncerradosComoResponsavel e a mesma populacao de Encerrados atribuida pelo
+    RESPONSAVEL (call_req.assignee, a coluna [Responsável] de
+    consulta_coi_encerrados.sql) - a convencao da "Consulta para Auditoria" e
+    da tabela por analista do relatorio do fornecedor (Historico Mestre, secoes
+    56 e 62). E A SERIE DO INDICADOR: a pagina Por Membro do painel usa
+    EncerradosComoResponsavel, com o rotulo "Encerrados". Conferido contra os
+    relatorios do fornecedor de 09/03 a 31/03/2026 e de junho/2026: mesmo
+    responsavel em 471 de 471 e 612 de 612 chamados comuns, e a tabela por
+    analista reproduzida nome a nome. A coluna Encerrados (quem executou o
+    encerramento) fica para auditoria e comparacao e nao alimenta o indicador.
 
-O RSP HISTORICO NAO E O ALVO
+    Um mesmo chamado pode contar em Registrados para uma pessoa e em
+    Encerrados para outra, so numa das series, ou em nenhuma. As somas de cada
+    serie fecham com o detalhe correspondente para o mesmo periodo:
+        SUM(Registrados) = linhas de consulta_coi_registrados_detalhe.sql
+        SUM(Encerrados)  = linhas de consulta_coi_encerrados.sql
+        SUM(EncerradosComoResponsavel) = linhas de consulta_coi_encerrados.sql
 
-    Os relatorios antigos do fornecedor vieram de OUTRA ferramenta/base, o
-    proprio fornecedor confirmou inconsistencias, e a aba DADOS guarda apenas
-    valores digitados - sem pivot, conexao ou formula que revele a regra. Eles
-    valem como referencia externa de reconciliacao; a definicao tecnica do
-    indicador e esta consulta, sobre o sistema fonte atual.
+QUEM EXECUTOU O ENCERRAMENTO (coluna Encerrados, auditoria) - e por que NAO e
+o "Responsavel"
 
-    Nenhum filtro aqui existe para aproximar numero de relatorio antigo.
+    call_req.assignee (a coluna [Responsável] de consulta_coi_encerrados.sql) e
+    o responsavel ATUAL do chamado, nao quem executou o encerramento. Medido em
+    01/04/2026 a 01/10/2026 (grupo COI_Novo, 3.558 encerrados), o autor do
+    evento que encerrou difere do assignee em 755 deles (21%):
+    nos encerramentos automaticos depois da homologacao, por exemplo, o
+    assignee continua sendo o analista e quem fechou foi a conta de automacao.
 
-LIMITE CONHECIDO - historico nao e imutavel
+    O SDM registra o encerramento de duas formas, medidas na mesma amostra:
+      - evento CL no proprio segundo do close_date ("Status alterado de ... para
+        'Resolvido, concluido'" ou "... 'Nao resolvido, fechado'"): 1.062
+        chamados;
+      - evento SOLN (registro da solucao) de 1 segundo a alguns minutos antes do
+        close_date, sem evento de status no fechamento: cerca de 2.250 chamados.
 
-    Uma execucao de hoje pode divergir de um relatorio emitido meses atras se
-    chamados foram corrigidos ou incluidos depois com open_date retroativo. O
-    horizonte de elegibilidade impede que MOVIMENTACAO posterior mude um periodo
-    fechado, mas nao reconstroi um snapshot antigo. Se for exigido que meses
-    fechados nunca mudem, o caminho e snapshot mensal persistido no fechamento -
-    decisao de projeto, nao implementada aqui.
+    REGRA: o encerramento e atribuido ao analista (act_log.analyst) do ULTIMO
+    evento de status ou de solucao do chamado - tipos CL, ST, CLREQ, RE, RO,
+    SOLN - gravado ATE o close_date. Desempate determinístico: system_time
+    decrescente e act_log.id decrescente (o id e a ordem de gravacao no SDM).
+    O diagnostico mostra o tipo do evento usado e a distancia ate o close_date.
+
+    ISTO NAO E A REGRA DE ENCERRADOS QUE A SECAO 62 DO HISTORICO DERRUBOU. Aquela
+    usava o act_log para decidir a POPULACAO (o grupo no encerramento) e foi
+    substituida pelo grupo ATUAL. Aqui a populacao continua sendo a da regra
+    oficial; o act_log so diz a QUEM cada encerramento ja apurado e atribuido,
+    sem parse de texto (le apenas type, system_time e analyst).
+
+TipoConta - classificacao da conta, fora de qualquer contagem
+    'Conta técnica / automação'  userid usr_automacoes ou sesuc_auto, ou userid
+                                 ou nome contendo SERVICEDESK / SERVICE DESK -
+                                 as tres contas tecnicas que o projeto ja
+                                 reconhece (consulta_coi_registrados_total_com_tecnicos.sql)
+    'Membro do grupo COI'        pessoa que consta HOJE em grpmem de @COI_Novo
+                                 ou de @COI_Antigo
+    'Fora do grupo COI'          pessoa que nao consta hoje em nenhum dos dois
+    'Não identificado'           chamado sem log_agent, encerramento sem evento,
+                                 encerramento sem responsavel (assignee nulo),
+                                 ou UUID sem contato em ca_contact
+    LIMITE: grpmem guarda a composicao ATUAL. Quem saiu da equipe aparece como
+    'Fora do grupo COI' nos meses em que ainda era membro, assim como analistas
+    que o relatorio do fornecedor lista no COI e que nao constam hoje em
+    grpmem. TipoConta nao filtra o indicador.
+
+CONTAGEM POR CHAMADO
+    Cada chamado entra UMA vez em cada serie: #Registrados e #EncerradosCOI tem
+    uma linha por chamado, e cada linha recebe UMA conta (log_agent, ou o
+    analista de UM evento escolhido por TOP (1)). A soma das contas e o total.
+
+O BLOCO CANONICO
+    O bloco canonico de Registrados, entre os seus marcadores de inicio e de
+    fim, e copiado sem alteracao de consulta_coi_registrados_encerrados_diario.sql. O texto
+    interno do bloco ainda cita "SETE consultas": esta e a oitava a usa-lo, e o
+    texto nao foi mudado para nao alterar o SHA256 conferido nas demais.
 
 Somente leitura. Batch unico. Nao existe GO neste arquivo.
 ================================================================================
@@ -101,19 +125,32 @@ Somente leitura. Batch unico. Nao existe GO neste arquivo.
 -- Nao usar 23:59:59 como fim: o chamado do ultimo segundo do dia ficaria de fora.
 --
 -- open_date e close_date em dbo.call_req sao epoch UTC em segundos (int).
--- Brasil = UTC-3 fixo (sem horario de verao desde 2019), mesma conversao ja
--- validada em decision/ e protect4/.
+-- Brasil = UTC-3 fixo (sem horario de verao desde 2019).
 --------------------------------------------------------------------------------
 DECLARE @HorasBrasilParaUTC int = 3;
 DECLARE @Epoch datetime2(0) = '1970-01-01 00:00:00';
 
--- [POWER BI] Periodo automatico, calculado no inicio do arquivo.
-DECLARE @InicioBR datetime2(0) = @PBI_InicioBR;   -- inclusivo
-DECLARE @FimBR    datetime2(0) = @PBI_FimBR;      -- EXCLUSIVO
+-- Periodo analisado. Altere apenas estas duas linhas.
+DECLARE @InicioBR datetime2(0) = '2026-09-01 00:00:00';   -- inclusivo
+DECLARE @FimBR    datetime2(0) = '2026-10-01 00:00:00';   -- EXCLUSIVO
 
 DECLARE @InicioEpoch int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @InicioBR));
 DECLARE @FimEpoch    int = DATEDIFF(SECOND, @Epoch, DATEADD(HOUR, @HorasBrasilParaUTC, @FimBR));
 
+-- Identidade do COI por UUID. Usada no filtro de ENCERRADOS e na classificacao
+-- 'Membro do grupo COI'. A regra de Registrados NAO usa UUID: decide por nome
+-- historico.
+DECLARE @COI_Antigo varbinary(16) = 0xDA7095D797E3FE498A62B79CB7EAED15;  -- 'Contrato 7/2023 - COI'
+DECLARE @COI_Novo   varbinary(16) = 0x3C11B3A9EBCE5D498E2F7D7FF385F967;  -- 'COI'
+
+-- Grupo alvo de ENCERRADOS. UM grupo por apuracao: producao/contrato vigente ->
+-- @COI_Novo. NAO somar os dois, NAO inferir pela data (os grupos coexistiram).
+-- Ver o cabecalho de consulta_coi_encerrados.sql.
+DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Novo;
+
+-- 0 = apenas o resultado por membro (uso normal).
+-- 1 = acrescenta um result set com a atribuicao de cada encerramento.
+DECLARE @MostrarDiagnostico bit = 0;
 
 --------------------------------------------------------------------------------
 -- INICIO REGRA CANONICA DE REGISTRADOS COI
@@ -1215,55 +1252,212 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- [C] CALENDARIO - existe para que o grafico tenha todos os dias/meses/horas do
---     intervalo, inclusive os de quantidade zero. Sem isso o eixo fica com
---     buracos.
+-- INICIO REGRA OFICIAL DE ENCERRADOS COI  (NAO ALTERAR SEM REVALIDAR)
 --
---     MesAno sai como AAAA-MM de proposito: DATENAME/FORMAT dependem do idioma
---     da sessao e produziriam rotulo diferente conforme o servidor. AAAA-MM e
---     estavel e ordena corretamente como texto.
+-- Identica a queries/consulta_coi_encerrados.sql, inclusive a validacao do grupo
+-- alvo:
+--     close_date na janela  E  type IN ('I','R')  E  status IN ('CL','CLUNRSLV')
+--     E  group_id ATUAL = @COI_GrupoAlvo, que precisa existir, estar ativo e ter
+--     ao menos um membro em grpmem.
 --------------------------------------------------------------------------------
-IF OBJECT_ID('tempdb..#Dias') IS NOT NULL DROP TABLE #Dias;
+DECLARE @GrupoNome     nvarchar(200);
+DECLARE @GrupoInativo  int;
+DECLARE @GrupoMembros  bigint;
 
-SELECT TOP (DATEDIFF(DAY, @InicioBR, @FimBR))
-    CONVERT(date, DATEADD(DAY, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1, @InicioBR)) AS dia
-INTO #Dias
-FROM sys.all_objects AS a
-CROSS JOIN sys.all_objects AS b;
+SELECT
+    @GrupoNome    = LTRIM(RTRIM(COALESCE(NULLIF(c.last_name, N''), NULLIF(c.userid, N''), N'(sem nome)'))),
+    @GrupoInativo = c.inactive
+FROM dbo.ca_contact AS c
+WHERE c.contact_uuid = @COI_GrupoAlvo;
 
-CREATE UNIQUE CLUSTERED INDEX IX_Dias ON #Dias(dia);
+SELECT @GrupoMembros = COUNT_BIG(*)
+FROM dbo.grpmem AS gm
+WHERE gm.group_id = @COI_GrupoAlvo;
 
-IF OBJECT_ID('tempdb..#Meses') IS NOT NULL DROP TABLE #Meses;
+DECLARE @GrupoAlvoValido bit =
+    CASE WHEN @GrupoNome IS NOT NULL AND @GrupoInativo = 0 AND @GrupoMembros > 0
+         THEN 1 ELSE 0 END;
 
-SELECT DISTINCT
-    YEAR(d.dia)  AS Ano,
-    MONTH(d.dia) AS Mes,
-    CONVERT(char(7), CONCAT(YEAR(d.dia), N'-', RIGHT(CONCAT(N'0', MONTH(d.dia)), 2))) AS MesAno
-INTO #Meses
-FROM #Dias AS d;
+IF @GrupoAlvoValido = 0
+    PRINT N'ATENCAO: o grupo alvo NAO passa no filtro da Consulta para Auditoria '
+        + N'(precisa existir, estar com inactive = 0 e ter ao menos um membro em grpmem). '
+        + N'A serie Encerrados sera ZERO por causa disso, e nao por ausencia de encerramentos.';
 
-CREATE UNIQUE CLUSTERED INDEX IX_Meses ON #Meses(Ano, Mes);
+IF OBJECT_ID('tempdb..#EncerradosCOI') IS NOT NULL DROP TABLE #EncerradosCOI;
+
+SELECT
+    r.id,
+    r.persid,
+    r.ref_num AS SDM,
+    r.close_date,
+    r.assignee,
+    DATEADD(HOUR, -@HorasBrasilParaUTC, DATEADD(SECOND, r.close_date, @Epoch)) AS encerramento_br
+INTO #EncerradosCOI
+FROM dbo.call_req AS r
+WHERE r.close_date >= @InicioEpoch
+  AND r.close_date <  @FimEpoch
+  AND r.[type]   IN ('I', 'R')
+  AND r.status   IN ('CL', 'CLUNRSLV')
+  AND r.group_id = @COI_GrupoAlvo
+  AND @GrupoAlvoValido = 1
+OPTION (RECOMPILE);
+
+CREATE UNIQUE CLUSTERED INDEX IX_EncerradosCOI ON #EncerradosCOI(id);
+--------------------------------------------------------------------------------
+-- FIM REGRA OFICIAL DE ENCERRADOS COI
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- RESULTADO - Registrados pelo COI por mes: Incidentes x Solicitacoes
+-- [E1] QUEM ENCERROU - o ultimo evento de status ou de solucao ate o close_date.
+--
+--      TOP (1) por chamado, entao cada encerramento recebe no maximo UMA conta.
+--      Sem nenhum evento desses tipos ate o close_date, o analista fica NULL e
+--      o encerramento conta como 'Não identificado' - nao e descartado.
+--------------------------------------------------------------------------------
+IF OBJECT_ID('tempdb..#Encerrador') IS NOT NULL DROP TABLE #Encerrador;
+
+SELECT
+    e.id,
+    e.SDM,
+    e.encerramento_br,
+    ult.analyst,
+    ult.tipo_evento,
+    CASE WHEN ult.system_time IS NULL THEN NULL
+         ELSE e.close_date - ult.system_time END AS segundos_ate_encerramento
+INTO #Encerrador
+FROM #EncerradosCOI AS e
+OUTER APPLY (
+    SELECT TOP (1)
+        al.analyst,
+        CONVERT(varchar(12), al.[type]) AS tipo_evento,
+        al.system_time
+    FROM dbo.act_log AS al
+    WHERE al.call_req_id = e.persid
+      AND al.system_time IS NOT NULL
+      AND al.system_time <= e.close_date
+      AND al.[type] IN ('CL', 'ST', 'CLREQ', 'RE', 'RO', 'SOLN')
+    ORDER BY al.system_time DESC, al.id DESC
+) AS ult;
+
+CREATE UNIQUE CLUSTERED INDEX IX_Encerrador ON #Encerrador(id);
+
+--------------------------------------------------------------------------------
+-- [M1] ATRIBUICOES - uma linha por chamado e por serie (R registro, E quem
+--      encerrou, A responsavel atual do encerrado), com o mes da data que
+--      alimenta a serie e a conta atribuida. Nenhuma linha some: conta NULL vira
+--      'Não identificado', com o motivo no nome.
+--------------------------------------------------------------------------------
+IF OBJECT_ID('tempdb..#Atribuicao') IS NOT NULL DROP TABLE #Atribuicao;
+
+SELECT
+    'R' AS serie,
+    YEAR(r.registro_br)  AS Ano,
+    MONTH(r.registro_br) AS Mes,
+    r.log_agent          AS conta,
+    CONVERT(nvarchar(60), N'(sem registrador no chamado)') AS sem_conta
+INTO #Atribuicao
+FROM #Registrados AS r
+UNION ALL
+SELECT
+    'E',
+    YEAR(x.encerramento_br),
+    MONTH(x.encerramento_br),
+    x.analyst,
+    CONVERT(nvarchar(60), N'(encerramento sem evento de status)')
+FROM #Encerrador AS x
+UNION ALL
+SELECT
+    'A',
+    YEAR(e.encerramento_br),
+    MONTH(e.encerramento_br),
+    e.assignee,
+    CONVERT(nvarchar(60), N'(encerrado sem responsável)')
+FROM #EncerradosCOI AS e;
+
+--------------------------------------------------------------------------------
+-- [M2] CLASSIFICACAO DAS CONTAS que aparecem nas atribuicoes.
+--      Uma linha por conta: contact_uuid e a chave de ca_contact; grpmem entra
+--      so em EXISTS, que nao multiplica linha.
+--------------------------------------------------------------------------------
+IF OBJECT_ID('tempdb..#Conta') IS NOT NULL DROP TABLE #Conta;
+
+SELECT
+    u.conta,
+    c.contact_uuid,
+    NULLIF(LTRIM(RTRIM(c.userid)), N'') AS userid,
+    CASE
+        WHEN c.contact_uuid IS NULL THEN N'(UUID sem contato em ca_contact)'
+        WHEN (ISNULL(c.first_name, N'') <> N'' OR ISNULL(c.last_name, N'') <> N'')
+            THEN LTRIM(RTRIM(CONCAT(ISNULL(c.first_name, N''), N' ', ISNULL(c.last_name, N''))))
+        WHEN ISNULL(c.userid, N'') <> N'' THEN LTRIM(RTRIM(c.userid))
+        ELSE N'(contato sem nome)'
+    END AS nome,
+    CONVERT(nvarchar(40), CASE
+        WHEN c.contact_uuid IS NULL THEN N'Não identificado'
+        WHEN c.userid COLLATE Latin1_General_CI_AI IN (N'USR_AUTOMACOES', N'SESUC_AUTO')
+          OR c.userid COLLATE Latin1_General_CI_AI LIKE N'%SERVICEDESK%'
+          OR CONCAT(c.first_name, N' ', c.last_name) COLLATE Latin1_General_CI_AI LIKE N'%SERVICEDESK%'
+          OR CONCAT(c.first_name, N' ', c.last_name) COLLATE Latin1_General_CI_AI LIKE N'%SERVICE DESK%'
+            THEN N'Conta técnica / automação'
+        WHEN EXISTS (SELECT 1 FROM dbo.grpmem AS gm
+                     WHERE gm.member = c.contact_uuid
+                       AND gm.group_id IN (@COI_Novo, @COI_Antigo))
+            THEN N'Membro do grupo COI'
+        ELSE N'Fora do grupo COI'
+    END) AS tipo_conta
+INTO #Conta
+FROM (SELECT DISTINCT a.conta FROM #Atribuicao AS a WHERE a.conta IS NOT NULL) AS u
+LEFT JOIN dbo.ca_contact AS c
+    ON c.contact_uuid = u.conta;
+
+CREATE UNIQUE CLUSTERED INDEX IX_Conta ON #Conta(conta);
+
+--------------------------------------------------------------------------------
+-- RESULTADO - Registrados x Encerrados por mes e por conta
 --------------------------------------------------------------------------------
 SELECT
-    m.Ano,
-    m.Mes,
-    m.MesAno,
-    ISNULL(agg.Incidentes,   0) AS Incidentes,
-    ISNULL(agg.Solicitacoes, 0) AS Solicitacoes,
-    ISNULL(agg.Total,        0) AS Total
-FROM #Meses AS m
-OUTER APPLY (
-    SELECT
-        SUM(CASE WHEN r.tipo = 'I' THEN 1 ELSE 0 END) AS Incidentes,
-        SUM(CASE WHEN r.tipo = 'R' THEN 1 ELSE 0 END) AS Solicitacoes,
-        COUNT(*)                                      AS Total
-    FROM #Registrados AS r
-    WHERE YEAR(r.registro_br)  = m.Ano
-      AND MONTH(r.registro_br) = m.Mes
-) AS agg
+    a.Ano,
+    a.Mes,
+    CONVERT(char(7), CONCAT(a.Ano, N'-', RIGHT(CONCAT(N'0', a.Mes), 2))) AS MesAno,
+    a.conta                                                     AS MembroUUID,
+    ISNULL(k.userid, N'-')                                      AS MembroUserID,
+    CASE WHEN a.conta IS NULL THEN a.sem_conta ELSE k.nome END  AS Membro,
+    CASE WHEN a.conta IS NULL THEN N'Não identificado' ELSE k.tipo_conta END AS TipoConta,
+    SUM(CASE WHEN a.serie = 'R' THEN 1 ELSE 0 END)              AS Registrados,
+    SUM(CASE WHEN a.serie = 'E' THEN 1 ELSE 0 END)              AS Encerrados,
+    SUM(CASE WHEN a.serie = 'A' THEN 1 ELSE 0 END)              AS EncerradosComoResponsavel
+FROM #Atribuicao AS a
+LEFT JOIN #Conta AS k
+    ON k.conta = a.conta
+GROUP BY
+    a.Ano, a.Mes, a.conta, k.userid,
+    CASE WHEN a.conta IS NULL THEN a.sem_conta ELSE k.nome END,
+    CASE WHEN a.conta IS NULL THEN N'Não identificado' ELSE k.tipo_conta END
 ORDER BY
-    m.Ano,
-    m.Mes;
+    a.Ano, a.Mes,
+    SUM(CASE WHEN a.serie = 'R' THEN 1 ELSE 0 END) + SUM(CASE WHEN a.serie = 'E' THEN 1 ELSE 0 END) DESC,
+    Membro;
+
+--------------------------------------------------------------------------------
+-- DIAGNOSTICO (opcional) - a quem cada encerramento foi atribuido, e por qual
+-- evento. Le a temp table do passo [E1]; a regra nao e reescrita aqui.
+--------------------------------------------------------------------------------
+IF @MostrarDiagnostico = 1
+SELECT
+    x.SDM,
+    x.encerramento_br AS DataEncerramento,
+    x.analyst         AS EncerradoPorUUID,
+    ISNULL(k.userid, N'-') AS EncerradoPorUserID,
+    CASE WHEN x.analyst IS NULL THEN N'(encerramento sem evento de status)' ELSE k.nome END AS EncerradoPor,
+    CASE WHEN x.analyst IS NULL THEN N'Não identificado' ELSE k.tipo_conta END AS TipoConta,
+    ISNULL(x.tipo_evento, N'-') AS EventoUsado,
+    x.segundos_ate_encerramento AS SegundosAteEncerramento,
+    ISNULL(kr.nome, N'(encerrado sem responsável)') AS ResponsavelAtual
+FROM #Encerrador AS x
+JOIN #EncerradosCOI AS e
+    ON e.id = x.id
+LEFT JOIN #Conta AS k
+    ON k.conta = x.analyst
+LEFT JOIN #Conta AS kr
+    ON kr.conta = e.assignee
+ORDER BY x.encerramento_br, x.SDM;

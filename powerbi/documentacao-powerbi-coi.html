@@ -1,49 +1,105 @@
-<!-- Documentacao das consultas do Power BI do COI para o visual HTML Content.
-Fonte oficial: powerbi/powerbi-query.md. Em caso de divergencia, vale ela.
+<!-- Conteudo da pagina Documentacao do painel do COI, para o visual HTML Content.
+Fontes oficiais: powerbi/powerbi-query.md (Power BI) e docs/coi-calculation.md
+(regras de calculo). Em caso de divergencia, valem elas.
 Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <div style='font-family:Segoe UI,Arial,sans-serif;font-size:13px;line-height:1.5;color:#1f2328;background:#ffffff;padding:16px;max-width:900px'>
 
-<h1 style='font-size:20px;margin:0 0 4px 0;color:#0b3d6b'>Consultas do Power BI — COI</h1>
-<p style='margin:0 0 12px 0;color:#57606a'>O que cada consulta entrega, como o período é calculado e como conferir o resultado.</p>
+<h1 style='font-size:20px;margin:0 0 4px 0;color:#0b3d6b'>Documentação do painel — COI</h1>
+<p style='margin:0 0 12px 0;color:#57606a'>O que o painel mede, de onde vêm os dados, quais regras definem cada número e como conferir o resultado.</p>
 
 <div style='background:#eef5fc;border-left:4px solid #0b5cad;padding:10px 12px;margin:0 0 16px 0'>
-<b>Em uma linha:</b> são <b>12 consultas</b>, uma para cada consulta de referência do COI, com <b>a mesma regra</b>. Para o mesmo período, cada uma devolve exatamente o resultado da sua referência. O período anda sozinho: os <b>6 meses completos</b> anteriores ao mês corrente.
+<b>Em uma linha:</b> o painel mede a <b>volumetria</b> do COI — quantos chamados <b>entram</b> no COI (Registrados) e quantos o COI <b>encerra</b> (Encerrados) — nos <b>meses completos</b> a partir de março de 2026, até 12 meses. São <b>7 consultas</b> SQL, cada uma com a mesma regra da sua consulta de referência.
 </div>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>1. As consultas</h2>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>1. Indicadores</h2>
 <table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
-<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Grupo</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Consultas</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Período</th></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — gráficos</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mensal, diário (Registrados × Encerrados), por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>automático</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — auditoria</td><td style='border:1px solid #d0d7de;padding:4px 6px'>detalhe, por evidência, por registrador, validação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>automático</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>encerrados, pesquisa de satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>automático</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Conciliação com o fornecedor</td><td style='border:1px solid #d0d7de;padding:4px 6px'>membros, contas técnicas, universo bruto</td><td style='border:1px solid #d0d7de;padding:4px 6px'>fixo</td></tr>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Indicador</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>O que conta</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Data usada</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Registrados</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Chamados que entram no COI <b>pela primeira vez</b> na sua vida. Cada chamado conta uma vez, mesmo que saia e volte</td><td style='border:1px solid #d0d7de;padding:4px 6px'>DataRegistroCOI — o instante da primeira entrada</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Encerrados</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Chamados fechados cujo grupo atual é o grupo alvo do COI</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Data de Encerramento</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Pesquisas</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Pesquisas de satisfação dos chamados Encerrados: respondidas e solicitadas</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Data de Encerramento</td></tr>
 </table>
-<p>As de conciliação contam pela <b>data de abertura</b> e por quem abriu o chamado, e <b>não são comparáveis</b> com as de Registrados.</p>
+<p><b>Registrados e Encerrados são universos diferentes</b>, cada um com a sua regra e a sua data. Um chamado pode entrar num mês e ser encerrado em outro, entrar e ser encerrado por outra fila, ou ser encerrado sem ter entrado no período. Por isso <b>Registrados menos Encerrados não é o estoque em aberto</b> do COI.</p>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>2. Período</h2>
-<ul style='margin-top:4px'>
-<li><b>Automático:</b> fim exclusivo no dia 1 do mês corrente, início <b>@PBI_QuantidadeMeses</b> meses antes. O padrão é <b>6</b>. Entram só meses completos; o mês em andamento fica de fora.</li>
-<li><b>Fixo:</b> membros, contas técnicas e universo bruto usam os períodos FEV, MAR e JUN de 2026 da referência, amarrados à lista de analistas de cada um.</li>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>2. Regras de negócio</h2>
+<p style='margin-bottom:2px'><b>Registrados</b></p>
+<ul style='margin-top:2px'>
+<li>A entrada no COI é reconstruída pela <b>cadeia de transferências de grupo</b> do histórico do chamado: aberto no COI, transferido para o COI ou, sem nenhuma transferência, inferido pelo grupo atual.</li>
+<li>Os registros das <b>automações</b> oficiais do COI (Task Scheduler) entram pela regra própria da automação.</li>
+<li>Reentradas contam uma vez; cada chamado gera <b>uma linha</b>. Chamados sem entrada demonstrável ficam fora, como ressalva.</li>
+<li>Tipos: Incidente e Solicitação.</li>
+</ul>
+<p style='margin-bottom:2px'><b>Encerrados</b></p>
+<ul style='margin-top:2px'>
+<li>Data de fechamento no período; Incidente ou Solicitação; status Fechado (CL) ou Fechado não resolvido (CLUNRSLV); <b>grupo atual</b> igual ao grupo alvo.</li>
+<li>O grupo alvo é <b>um só</b>: a fila COI. A fila antiga (Contrato 7/2023 - COI) é outro contrato e <b>não é somada</b>. O grupo é conferido antes da contagem: precisa existir, estar ativo e ter membros; se não passar, a consulta sai vazia.</li>
+</ul>
+<p style='margin-bottom:2px'><b>Por membro: registros e encerramentos</b></p>
+<ul style='margin-top:2px'>
+<li><b>Registrados</b> de um membro: os chamados que ele abriu. Num chamado transferido para o COI, quem abriu é alguém de outra fila.</li>
+<li><b>Encerrados</b> de um membro: os chamados encerrados de que ele é o <b>responsável</b> — o <b>critério do fornecedor</b>, o mesmo da tabela por analista do relatório mensal. Só a atribuição segue o fornecedor; quais chamados contam como Encerrados é a regra acima.</li>
+<li>Cada conta é classificada: <b>Membro do grupo COI</b>, <b>Fora do grupo COI</b>, <b>Conta técnica / automação</b> (usr_automacoes, Sesuc Automação, Service Desk) ou <b>Não identificado</b>.</li>
+</ul>
+<p style='margin-bottom:2px'><b>Satisfação</b></p>
+<ul style='margin-top:2px'>
+<li><b>Com satisfação</b>: a pesquisa do chamado tem ao menos uma pergunta respondida. A resposta exibida é a da pergunta de satisfação geral com a execução dos serviços. Havendo várias pesquisas, vale a mais recente.</li>
+<li><b>Pesquisa solicitada</b>: o SDM registrou o envio do pedido de pesquisa para o chamado. Solicitar não é responder.</li>
 </ul>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>3. Saída</h2>
-<p>O Power BI lê só o primeiro resultado de uma consulta. Quando a referência devolve vários, eles saem <b>empilhados</b>, e a coluna <b>TipoResultado</b> diz de qual cada linha veio:</p>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>3. Fonte dos dados</h2>
+<p>Base <b>mdb</b> do CA Service Desk Manager, no SQL Server, lida <b>somente para leitura</b>, modo Importação. As datas da base estão em UTC e são convertidas para o <b>horário de Brasília</b>.</p>
 <table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
-<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Consulta</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>TipoResultado</th></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>JANELA_1_RESUMO, JANELA_2_DETALHE, CONFERENCIA</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>validação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>SANIDADE, CONSISTENCIA, REGRESSOES, RESSALVAS</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>membros</td><td style='border:1px solid #d0d7de;padding:4px 6px'>RESUMO_PERIODO, POR_ANALISTA, DETALHE</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>contas técnicas</td><td style='border:1px solid #d0d7de;padding:4px 6px'>RESUMO_PERIODO, ORIGEM_DO_TOTAL, DETALHE</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>universo bruto</td><td style='border:1px solid #d0d7de;padding:4px 6px'>RESUMO, POR_CONTA_TECNICA, DETALHE</td></tr>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Tabela</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Uso</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>call_req</td><td style='border:1px solid #d0d7de;padding:4px 6px'>O chamado: número, tipo, status, grupo atual, datas, quem abriu, responsável atual</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>act_log</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Histórico: transferências de grupo, eventos de fechamento e de solução, pedidos de pesquisa</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>ca_contact, grpmem</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Grupos, pessoas e a composição atual dos grupos</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>cr_stat, prob_ctg, ca_owned_resource</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Nome do status, categoria e item de configuração</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>survey, survey_question, survey_answer</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Pesquisas de satisfação e a opção escolhida</td></tr>
 </table>
-<p>Cada linha traz preenchidas só as colunas do seu TipoResultado. As demais consultas devolvem um único resultado, com as mesmas colunas da referência.</p>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>4. Grupo alvo de Encerrados</h2>
-<p>Encerrados, satisfação e o diário usam <b>@COI_Novo</b> (fila COI). No diário, para consultar o grupo anterior, troque a atribuição:</p>
-<p style='font-family:Consolas,monospace;background:#f6f8fa;padding:8px 10px'>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Novo;&nbsp;&nbsp;&nbsp;-- padrão<br>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Antigo;&nbsp;-- grupo anterior</p>
-<p>Só a série Encerrados muda. Com o grupo anterior, ela fica vazia a partir de abril de 2026.</p>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>4. Consultas do painel</h2>
+<table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Consulta</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Uma linha por</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Páginas</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado registrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados diário</td><td style='border:1px solid #d0d7de;padding:4px 6px'>dia, inclusive sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e conta</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td></tr>
+</table>
+<p>Cada consulta do painel aplica a mesma regra da sua consulta de referência; muda só o período, que é automático. Consultas de auditoria e de conciliação com o fornecedor (validação, por evidência, por registrador, membros, contas técnicas, universo bruto) não alimentam o painel e são usadas fora dele.</p>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>5. Colunas de diagnóstico do detalhe</h2>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>5. Páginas</h2>
+<table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Página</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Finalidade</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Início</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Navegação para as demais páginas</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Totais de Registrados e Encerrados; gráfico de colunas com detalhamento Ano › Mês › Dia; lista dos chamados, Registrados ou Encerrados</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Em que hora do dia os chamados entram ou são encerrados; tabela com as 24 horas, inclusive as sem movimento</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Quantos chamados cada conta registrou e encerrou, com a classificação da conta</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Tipo</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Incidentes e Solicitações, em Registrados e em Encerrados</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Quantidade de pesquisas e o detalhe por chamado encerrado</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Este conteúdo: indicadores, regras, fontes, consultas e funcionamento do painel</td></tr>
+</table>
+<p>As sete consultas usam o <b>mesmo período</b> e trazem o mês de cada linha, o que permite um único filtro <b>Mês/Ano</b> para as cinco páginas analíticas. A sincronização do filtro, os relacionamentos e as medidas são configurados no modelo do Power BI.</p>
+
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>6. Período</h2>
+<ul style='margin-top:4px'>
+<li>Calculado a cada atualização: <b>fim</b> (exclusivo) no dia 1 do mês corrente; <b>início</b> 12 meses antes, mas nunca antes de <b>01/03/2026</b>. Em outubro de 2026, o painel mostra de março a setembro de 2026.</li>
+<li>Entram só <b>meses completos</b>: o mês em andamento aparece depois que termina.</li>
+<li>Março de 2026 é o mês em que o novo COI passou a usar o código de fornecedor atual, e entra inteiro. Antes dele, os encerramentos são do contrato antigo, que a regra não soma.</li>
+<li>Março é mês de transição: o grupo antigo ainda encerrou chamados até 24/03. Esses encerramentos são do contrato anterior e não entram; os Encerrados de março são os da fila COI.</li>
+</ul>
+
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>7. Como ler</h2>
+<ul style='margin-top:4px'>
+<li><b>Responsável</b>, na lista de Encerrados, é o mesmo critério da página Por Membro: o responsável pelo chamado, que nem sempre é quem executou o fechamento.</li>
+<li><b>Por Membro</b>: Registrados e Encerrados de uma conta não precisam ser parecidos. Registros de automação e de chamados transferidos aparecem nas contas técnicas e em Fora do grupo COI. A consulta guarda também quem executou cada encerramento, só para auditoria: não é somado ao indicador.</li>
+<li><b>Membro do grupo COI</b> é a composição de hoje: quem saiu da equipe aparece como Fora do grupo COI, inclusive nos meses em que era membro.</li>
+<li><b>Satisfação</b> quase nunca tem resposta nas filas do COI: o pedido de pesquisa é registrado, mas quase nenhum é respondido. Isso é esperado.</li>
+<li>As consultas leem o estado atual da base: uma correção posterior num chamado pode mudar um mês já fechado na próxima atualização.</li>
+</ul>
+
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>8. Colunas de diagnóstico do detalhe de Registrados</h2>
 <table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
 <tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Coluna</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>O que representa</th></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>GrupoInit</td><td style='border:1px solid #d0d7de;padding:4px 6px'>O valor informado em <i>%GROUP=</i> na criação do chamado, normalizado. É informação auxiliar e pode não coincidir com o grupo em que o chamado nasceu</td></tr>
@@ -52,26 +108,20 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 </table>
 <p><b>GrupoInit diferente de PrimeiraOrigemGrupo não é erro.</b> As três colunas são de diagnóstico; a entrada no indicador é decidida pela cadeia de transferências. Exemplo: no SDM 1658863, GrupoInit é <i>VIRTUAL TI.ELABORAR/MANTER DOCUMENTAÇÃO</i>, PrimeiraOrigemGrupo é <i>COI</i> e PrimeiroDestinoGrupo é <i>FORNECEDORES - VIRTUAL</i>. O chamado nasceu no COI e entra como <i>ABERTO_NO_COI_CADEIA</i>, datado na abertura.</p>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>6. Gráficos</h2>
-<ul style='margin-top:4px'>
-<li><b>Registrados por mês:</b> consulta mensal, MesAno no eixo, Incidentes e Solicitacoes nas séries.</li>
-<li><b>Registrados × Encerrados por dia:</b> consulta diária, Dia no eixo, Registrados e Encerrados nas séries.</li>
-<li><b>Registrados por hora:</b> consulta por hora, HoraLabel no eixo, filtrada por MesAno.</li>
-</ul>
-<p>Registrados e Encerrados não são o mesmo universo: Registrados menos Encerrados <b>não</b> é o estoque em aberto do COI.</p>
-
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>7. Manutenção no Power Query</h2>
-<p><b>Onde fica o SQL:</b> Página Inicial › <b>Transformar dados</b> › selecione a consulta › em <b>Etapas aplicadas</b>, clique na <b>engrenagem</b> da etapa <b>Fonte</b> › <b>Opções avançadas</b> › campo <b>Instrução SQL</b>. Depois de editar: <b>OK</b> › <b>Fechar e aplicar</b>, e aprove a <b>consulta nativa</b> quando o Power BI pedir.</p>
-<p><b>Conexão:</b> SQL Server, banco <b>mdb</b>, modo <b>Importação</b>, arquivo inteiro na Instrução SQL, <b>Adicionar colunas de relação</b> desmarcado.</p>
-
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>8. Conferência depois de atualizar</h2>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>9. Conferência depois de atualizar</h2>
 <ol style='margin-top:4px'>
-<li><b>Registrados fecham:</b> soma de Total (mensal) = soma de Registrados (diário) = soma de QtdRegistrados (por hora).</li>
-<li><b>Tipos fecham:</b> em cada mês, Incidentes + Solicitacoes = Total.</li>
-<li><b>Calendário completo:</b> 6 meses, um dia por linha no diário, 24 horas por mês.</li>
-<li><b>Sem duplicidade:</b> no detalhe, linhas = SDMs distintos.</li>
-<li><b>Validação:</b> em SANIDADE, as 16 asserções em SIM; em CONSISTENCIA, Consistente = SIM.</li>
+<li><b>Registrados fecham:</b> as linhas do detalhe de Registrados são iguais à soma de Registrados do diário, do por hora e do por membro.</li>
+<li><b>Encerrados fecham:</b> as linhas de Encerrados são iguais à soma de Encerrados do diário, do por hora e do por membro, e às linhas da Satisfação.</li>
+<li><b>Tipos fecham:</b> Incidentes + Solicitações = total, em Registrados e em Encerrados.</li>
+<li><b>Calendário completo:</b> todos os dias no diário e 24 horas por mês no por hora.</li>
 </ol>
+
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>10. Manutenção</h2>
+<p><b>Onde fica o SQL:</b> Página Inicial › <b>Transformar dados</b> › selecione a consulta › em <b>Etapas aplicadas</b>, clique na <b>engrenagem</b> da etapa <b>Fonte</b> › <b>Opções avançadas</b> › campo <b>Instrução SQL</b>. Depois de editar: <b>OK</b> › <b>Fechar e aplicar</b>, e aprove a <b>consulta nativa</b> quando o Power BI pedir.</p>
+<p><b>Conexão:</b> SQL Server, banco <b>mdb</b>, modo <b>Importação</b>, arquivo inteiro na Instrução SQL, <b>Adicionar colunas de relação</b> desmarcado. Para mudar a cobertura, altere <b>@PBI_QuantidadeMeses</b> nas sete consultas.</p>
+<p><b>Grupo alvo de Encerrados:</b> todas as consultas usam <b>@COI_Novo</b> (fila COI). No diário, para consultar o grupo anterior, troque a atribuição:</p>
+<p style='font-family:Consolas,monospace;background:#f6f8fa;padding:8px 10px'>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Novo;&nbsp;&nbsp;&nbsp;-- padrão<br>DECLARE @COI_GrupoAlvo varbinary(16) = @COI_Antigo;&nbsp;-- grupo anterior</p>
+<p>Só a série Encerrados muda. Com o grupo anterior, ela fica vazia a partir de abril de 2026.</p>
 
 <p style='margin-top:16px;color:#57606a;font-size:12px'>Documentação completa e regras de cálculo ficam no repositório interno de manutenção do COI, usado apenas pela equipe responsável pelo relatório.</p>
 </div>

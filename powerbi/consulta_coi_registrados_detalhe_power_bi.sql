@@ -9,8 +9,9 @@ SET NOCOUNT ON;
 -- corpo com [POWER BI]. Se esta versao e a fonte divergirem, vale a fonte.
 --
 -- Adaptacoes:
---   - periodo automatico: os @PBI_QuantidadeMeses meses de calendario COMPLETOS
---     anteriores ao mes corrente, no lugar das datas digitadas;
+--   - periodo automatico: os meses de calendario COMPLETOS anteriores ao mes
+--     corrente - ate @PBI_QuantidadeMeses, a partir de @PBI_InicioMinimoBR -,
+--     no lugar das datas digitadas;
 --   - saida: a fonte ja devolve um unico result set, que sai sem alteracao.
 --
 -- Power BI: conector SQL Server, banco mdb, modo Importacao, este arquivo
@@ -25,19 +26,31 @@ SET NOCOUNT ON;
 -- Aqui ele e calculado a cada atualizacao, na mesma forma:
 --
 --     fim    (exclusivo) = dia 1 do mes corrente, 00:00:00, horario do Brasil
---     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim
+--     inicio (inclusivo) = @PBI_QuantidadeMeses meses antes do fim, mas nunca
+--                          antes de @PBI_InicioMinimoBR
 --
--- Entram so meses COMPLETOS: o mes em andamento fica de fora. Para mudar a
--- cobertura, altere apenas @PBI_QuantidadeMeses.
+-- Entram so meses COMPLETOS: o mes em andamento fica de fora. As consultas do
+-- painel usam todas este MESMO periodo, para que o filtro Mes/Ano enxergue os
+-- mesmos meses em todas as paginas.
+--
+-- @PBI_InicioMinimoBR = 01/03/2026: mes em que o novo COI passou a usar o
+-- codigo de fornecedor atual, o grupo alvo de Encerrados (@COI_Novo). Marco
+-- entra INTEIRO. Antes dele, os encerramentos sao do grupo antigo - outro
+-- contrato, que a regra de Encerrados nao soma -, e o painel mostraria meses
+-- sem Encerrados ao lado de meses com Registrados. Para mudar a cobertura,
+-- altere apenas @PBI_QuantidadeMeses; o piso so muda se mudar o grupo alvo.
 --------------------------------------------------------------------------------
-DECLARE @PBI_QuantidadeMeses int = 6;
+DECLARE @PBI_QuantidadeMeses int = 12;
+DECLARE @PBI_InicioMinimoBR datetime2(0) = '2026-03-01 00:00:00';
 
 DECLARE @PBI_HojeBR date =
     CONVERT(date, DATEADD(HOUR, -3, SYSUTCDATETIME()));
 DECLARE @PBI_FimBR datetime2(0) =
     CONVERT(datetime2(0), DATEFROMPARTS(YEAR(@PBI_HojeBR), MONTH(@PBI_HojeBR), 1));
 DECLARE @PBI_InicioBR datetime2(0) =
-    DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR);
+    CASE WHEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR) > @PBI_InicioMinimoBR
+         THEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR)
+         ELSE @PBI_InicioMinimoBR END;
 
 
 /*
@@ -49,9 +62,13 @@ Prova de auditoria da base de Registrados: lista NOMINALMENTE os chamados que
 compoem o total do indicador, com quem registrou e POR QUE cada um entrou.
 
 Saida: UM unico result set, UMA linha por SDM.
-    SDM, DataHoraRegistro, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
-    RegistradorUUID, RegistradorUserID, RegistradorNome,
-    GrupoAtualUUID, EvidenciaCOI, AliasEvidencia, DataPrimeiraEntradaCOI
+    SDM, Categoria, Resumo, DataAbertura, DataRegistroCOI, FormaRegistroCOI,
+    EvidenciaRegistroCOI, TipoAutomacaoCOI, GrupoInit, PrimeiraOrigemGrupo,
+    PrimeiroDestinoGrupo, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
+    RegistradorUUID, RegistradorUserID, RegistradorNome, AliasEvidencia,
+    DataPrimeiroEventoGrupo, QtdEventosGrupo, QtdAncorasGrupo,
+    QtdAncorasAntesDo1oLegivel, DataPrimeiraEntradaNoCOI, UUIDGrupoAtual,
+    GrupoAtual, InitConsistenteComReconstrucao, AbertoAntesDoPeriodo, Anomalia
 
 QUEM REGISTROU
     A fonte tecnica e call_req.log_agent. ca_contact entra apenas por LEFT JOIN,
@@ -1247,6 +1264,19 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 -- le #Registrados como o bloco canonico entregou. Nenhuma coluna aqui pode
 -- alterar populacao, DataRegistroCOI ou evidencia.
 --
+-- CATEGORIA E RESUMO (colunas informativas, logo apos SDM)
+--
+--   Categoria e Resumo seguem a mesma definicao de [Símbolo] e [Resumo] em
+--   queries/consulta_coi_encerrados.sql:
+--     Categoria = prob_ctg.sym, ligada por call_req.category = prob_ctg.persid;
+--                 sem categoria resolvida, 'N/A'.
+--     Resumo    = call_req.summary sem espacos nas pontas; sem resumo, texto
+--                 vazio (nunca NULL).
+--   Sao lidas aqui, na projecao, por dois LEFT JOIN de chave unica (call_req.id
+--   e prob_ctg.persid). Nao entram em predicado nem na classificacao, e nao
+--   multiplicam nem removem linha: a populacao e a do bloco canonico, intacta.
+--   O bloco canonico de Registrados, acima, NAO foi alterado.
+--
 -- AS DUAS COLUNAS DE EVIDENCIA, e por que sao duas
 --
 --   FormaRegistroCOI      texto de negocio, para ler e filtrar no Excel/Power BI
@@ -1286,6 +1316,8 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 SELECT
     -- IDENTIFICACAO E EIXO
     r.SDM,
+    ISNULL(pc.sym, N'N/A')                          AS [Categoria],
+    LTRIM(RTRIM(ISNULL(cr.summary, N'')))           AS [Resumo],
     r.abertura_br                                   AS DataAbertura,
     r.registro_br                                   AS DataRegistroCOI,
 
@@ -1361,6 +1393,11 @@ SELECT
 FROM #Registrados AS r
 LEFT JOIN dbo.ca_contact AS reg
     ON reg.contact_uuid = r.log_agent
+-- Categoria e Resumo: so leitura, chave unica (id e persid), sem filtro.
+LEFT JOIN dbo.call_req AS cr
+    ON cr.id = r.id
+LEFT JOIN dbo.prob_ctg AS pc
+    ON pc.persid = cr.category
 ORDER BY
     r.registro_br,
     r.SDM;

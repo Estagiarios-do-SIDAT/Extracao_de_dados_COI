@@ -10,9 +10,13 @@ Prova de auditoria da base de Registrados: lista NOMINALMENTE os chamados que
 compoem o total do indicador, com quem registrou e POR QUE cada um entrou.
 
 Saida: UM unico result set, UMA linha por SDM.
-    SDM, Categoria, Resumo, DataHoraRegistro, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
-    RegistradorUUID, RegistradorUserID, RegistradorNome,
-    GrupoAtualUUID, EvidenciaCOI, AliasEvidencia, DataPrimeiraEntradaCOI
+    SDM, Categoria, Resumo, DataAbertura, DataRegistroCOI, FormaRegistroCOI,
+    EvidenciaRegistroCOI, TipoAutomacaoCOI, GrupoInit, PrimeiraOrigemGrupo,
+    PrimeiroDestinoGrupo, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
+    RegistradorUUID, RegistradorUserID, RegistradorNome, AliasEvidencia,
+    DataPrimeiroEventoGrupo, QtdEventosGrupo, QtdAncorasGrupo,
+    QtdAncorasAntesDo1oLegivel, DataPrimeiraEntradaNoCOI, UUIDGrupoAtual,
+    GrupoAtual, InitConsistenteComReconstrucao, AbertoAntesDoPeriodo, Anomalia
 
 QUEM REGISTROU
     A fonte tecnica e call_req.log_agent. ca_contact entra apenas por LEFT JOIN,
@@ -1210,12 +1214,12 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 --
 -- CATEGORIA E RESUMO (colunas informativas, logo apos SDM)
 --
---   Categoria e Resumo seguem a mesma definicao do FAIA/FARC da Decision
---   (decision/queries/consulta_faia_farc.sql):
+--   Categoria e Resumo seguem a mesma definicao de [Símbolo] e [Resumo] em
+--   queries/consulta_coi_encerrados.sql:
 --     Categoria = prob_ctg.sym, ligada por call_req.category = prob_ctg.persid;
 --                 sem categoria resolvida, 'N/A'.
---     Resumo    = call_req.summary convertido para nvarchar(4000), sem espacos
---                 nas pontas.
+--     Resumo    = call_req.summary sem espacos nas pontas; sem resumo, texto
+--                 vazio (nunca NULL).
 --   Sao lidas aqui, na projecao, por dois LEFT JOIN de chave unica (call_req.id
 --   e prob_ctg.persid). Nao entram em predicado nem na classificacao, e nao
 --   multiplicam nem removem linha: a populacao e a do bloco canonico, intacta.
@@ -1261,7 +1265,7 @@ SELECT
     -- IDENTIFICACAO E EIXO
     r.SDM,
     ISNULL(pc.sym, N'N/A')                          AS [Categoria],
-    LTRIM(RTRIM(CONVERT(nvarchar(4000), cr.summary))) AS [Resumo],
+    LTRIM(RTRIM(ISNULL(cr.summary, N'')))           AS [Resumo],
     r.abertura_br                                   AS DataAbertura,
     r.registro_br                                   AS DataRegistroCOI,
 
