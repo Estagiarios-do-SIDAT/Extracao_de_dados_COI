@@ -25287,3 +25287,193 @@ referência em `queries/`.
 `README.md` (estrutura, consultas, painel), `docs/coi-calculation.md` (§1 e §9,
 nova subseção Registrados × Encerrados por hora; §15), `powerbi/powerbi-query.md`
 (6 consultas, página Por Hora, alertas) e `powerbi/documentacao-powerbi-coi.html`.
+
+## 77. 2026-10-29 — layout do painel COI no Figma (7 páginas), antes da implementação no Power BI
+
+Esta seção registra **só o design**. Nenhuma consulta, regra, cálculo ou
+documento funcional mudou; não há `.pbix`, `.pbip` nem DAX. O que está descrito
+como "no Power BI" é o que ainda será implementado, depois da revisão do layout.
+
+Arquivo: Figma "Indicadores e Relatórios de Serviços"
+(`https://www.figma.com/design/vwvcSDSdcyjKSAKTcREl2w`), página **COI**.
+As páginas Virtual, Decision e Protect4 serviram só de referência visual e
+**não foram alteradas** (somente leitura).
+
+### 77.1. O que foi construído no Figma
+
+Os 7 frames existentes da página COI (1280 × 720, 16:9, o tamanho padrão de
+página do Power BI) foram preenchidos sem mudar nome, posição ou tamanho:
+Início, Visão Geral, Por Hora, Por Membro, Por Tipo, Satisfação e
+Documentação. Não há oitava página nem página "Por Mês".
+
+Todos os elementos são camadas editáveis (texto, frames, vetores e instâncias
+de componentes); a única imagem é o logo do TCU (34 × 28). A auditoria final
+não encontrou nenhum elemento fora dos limites dos frames.
+
+Abaixo dos frames, na mesma página, fica a seção **"Componentes do painel COI —
+estados e elementos reutilizáveis (não é página do painel)"**, com os
+componentes principais e os estados alternativos de cada página.
+
+### 77.2. Identidade visual
+
+| Elemento | Decisão |
+|---|---|
+| Fundo | O mesmo fundo institucional das páginas Virtual e Decision (faixa amarela, azul e verde à esquerda), com painel claro `#F8F8F8` por cima |
+| Fonte | DIN (Bold, Medium, Regular), a mesma das outras páginas |
+| Registrados | Verde TCU `#008C44` (texto `#106235`) |
+| Encerrados | Azul-violeta TCU `#25247B` (texto `#352061`) |
+| Amarelo | `#EBC230` / `#FFCB08` só em destaques: Satisfação, Documentação e avisos |
+| Página ativa | Botão preenchido em `#25247B` |
+| Cartões | Brancos, cantos de 15 px, borda `#DCDCDC`, como nas outras páginas |
+
+Estilos locais criados com prefixo `COI/`: 14 de cor e 11 de texto.
+
+### 77.3. Navegação e filtros
+
+- **Barra superior** com 7 botões (Início com ícone de casa), à direita do
+  cabeçalho, com a página atual destacada. A Início não tem barra: os 6
+  cartões são a navegação.
+- **Filtro Mês/Ano** e **Limpar filtros** no mesmo componente, no mesmo lugar
+  das 5 páginas analíticas (Visão Geral, Por Hora, Por Membro, Por Tipo,
+  Satisfação), com a etiqueta "sincronizado entre as páginas". Valor padrão
+  "Todos os meses". Sem botões de 6 meses, 1 ano ou 2 anos: o período vem das
+  consultas (até 12 meses completos, nunca antes de 01/03/2026).
+- Início e Documentação não têm filtro.
+- **Protótipo**: os botões da barra e os cartões da Início levam à página
+  correspondente; ponto de início "Painel COI" na Início.
+
+### 77.4. As páginas
+
+| Página | Conteúdo | Visual |
+|---|---|---|
+| Início | Título "Painel de Indicadores do COI", 6 cartões de acesso, "Unidade gestora: SIDAT" e "Fonte de dados: bdados-14r;mdb" | Sem filtro, gráfico, número ou tabela |
+| Visão Geral | Cartões Registrados e Encerrados; Gráfico \| Tabela | Colunas agrupadas Registrados × Encerrados com hierarquia Ano › Mês › Dia e os 4 controles de drill do Power BI no canto do visual; ou tabela de chamados (SDM, data, tipo, categoria, registrador ou responsável, resumo), Registrados **ou** Encerrados |
+| Por Hora | Gráfico \| Tabela | Gráfico de colunas 00h–23h com **uma** série por vez (Registrados ou Encerrados, sem "Ambos"); tabela sempre Hora × Registrados × Encerrados, 24 linhas e total |
+| Por Membro | Gráfico \| Tabela | Barras horizontais agrupadas com as duas séries juntas; tabela Membro × Registrados × Encerrados. Aviso fixo: Encerrados pelo responsável do chamado, critério do fornecedor |
+| Por Tipo | Gráfico \| Tabela | Dois gráficos lado a lado, Registrados por tipo e Encerrados por tipo (Incidente, Solicitação); tabela Tipo × Registrados × Encerrados |
+| Satisfação | Cartões Pesquisas solicitadas e Pesquisas respondidas; tabela | Detalhe por chamado: pesquisa solicitada, situação (Com/Sem satisfação) e avaliação (Ótimo, Bom, Regular, Ruim); aviso "pesquisa solicitada não é pesquisa respondida" |
+| Documentação | Índice e 6 blocos | Indicadores, regras de cálculo, fonte dos dados, Registrados × Encerrados, filtros e período, navegação — resumo de `powerbi/documentacao-powerbi-coi.html` |
+
+Os números nos gráficos, cartões e tabelas são **ilustrativos** e estão
+marcados assim; não são resultados do COI.
+
+### 77.5. Estados alternativos (Gráfico | Tabela, Registrados | Encerrados)
+
+Cada página com alternância tem um componente de conteúdo com variantes —
+Visão Geral: Gráfico, Tabela – Registrados, Tabela – Encerrados; Por Hora:
+Gráfico – Registrados, Gráfico – Encerrados, Tabela; Por Membro e Por Tipo:
+Gráfico, Tabela. O frame mostra o estado padrão (Gráfico) e, no protótipo, os
+controles trocam a variante. É a representação de **bookmarks** do Power BI:
+cada estado será um conjunto de visuais exibidos e ocultados por botões.
+
+### 77.6. A implementar no Power BI (não feito nesta etapa)
+
+- Páginas, visuais, segmentação Mês/Ano sincronizada (painel Sincronizar
+  segmentações), botão Limpar filtros (indicador que limpa a segmentação),
+  bookmarks das alternâncias e botões de navegação de página.
+- Por Membro: o visual usa `EncerradosComoResponsavel` com o rótulo
+  "Encerrados"; `Encerrados` (quem executou o encerramento) não entra no
+  indicador, e `TipoConta` não filtra membros.
+- Satisfação: os dois cartões contam linhas com `PesquisaSolicitada = Sim` e
+  com `StatusSatisfacao = Com satisfação`.
+- Documentação: o conteúdo completo vem de `powerbi/documentacao-powerbi-coi.html`
+  no visual HTML Content; o Figma mostra a organização da página.
+
+### 77.7. Limitações
+
+- Os controles de drill, a segmentação e as tabelas são representações
+  estáticas; o comportamento real (rolagem, ordenação, drill) é do Power BI.
+- A troca de estados no protótipo é por variante de componente; no Power BI,
+  por bookmarks.
+
+## 78. 2026-10-29 — período do Power BI por um único parâmetro: `QtdMesesCompletosCOI`
+
+Nenhuma regra mudou. Antes, a quantidade de meses era o `12` fixo de
+`@PBI_QuantidadeMeses` em cada uma das seis consultas de `powerbi/`; mudar a
+cobertura exigia editar os seis textos. Agora ela vem de **um parâmetro do Power
+Query**, e os textos SQL não mudam quando o número muda.
+
+### 78.1. Decisão
+
+| Item | Decisão |
+|---|---|
+| Parâmetro | `QtdMesesCompletosCOI`, número, padrão **12**, só inteiro positivo |
+| Piso | continua **01/03/2026** (`@PBI_InicioMinimoBR`), fixo no SQL — acompanha o grupo alvo de Encerrados |
+| Fim | dia 1 do mês corrente, horário de Brasília: só meses completos |
+| Transporte até o SQL | parâmetro SQL tipado (`Value.NativeQuery` → `sp_executesql`), não concatenação de texto |
+| Texto SQL | continua incorporado ao relatório (etapa `Sql` de cada consulta); nenhum caminho local |
+| Parâmetro × filtro | o parâmetro define quantos meses o modelo **carrega**; o filtro Mês/Ano define quais dos carregados o usuário **vê** |
+
+Alternativas descartadas: trocar o `12` por concatenação de texto (sem
+parâmetro SQL, frágil a valores inválidos); ler os `.sql` do disco
+(`File.Contents` depende de caminho local e não atualiza no Serviço sem gateway
+de arquivos).
+
+### 78.2. O que mudou nas seis consultas de `powerbi/`
+
+Só o bloco `[POWER BI] PERIODO AUTOMATICO`, idêntico nas seis:
+
+- a linha `DECLARE @PBI_QuantidadeMeses int = 12;` **ficou** — é o marcador que o
+  Power Query troca por `= @QtdMesesCompletosCOI;`, e o 12 vale quando o arquivo
+  roda fora do Power BI (SSMS);
+- `IF @PBI_QuantidadeMeses IS NULL OR @PBI_QuantidadeMeses < 1 THROW 50001, ...`
+  — o SQL recusa valor inválido mesmo se o Power Query for alterado;
+- o início passou de `CASE WHEN DATEADD(MONTH, -n, fim) > piso` para
+  `CASE WHEN n < DATEDIFF(MONTH, piso, fim)`. As duas formas são equivalentes
+  porque fim e piso são dias 1; a nova não estoura o `DATEADD` com `n` muito
+  grande (valor máximo testado: 2.147.483.647, que resulta no piso);
+- o comentário do bloco explica o marcador e remete a `powerbi-query.md`.
+
+Bloco canônico de Registrados intocado: as 13 cópias seguem idênticas (9 em
+`queries/`, 4 em `powerbi/`). As consultas de `queries/` não mudaram: elas usam
+datas digitadas, e o parâmetro é próprio do Power BI.
+
+### 78.3. Camada de adaptação no Power Query
+
+- `QtdMesesCompletosCOI` — parâmetro (`IsParameterQuery`), não carregado.
+- `Executar consulta COI` — função, não carregada: valida o parâmetro
+  (`Number.RoundDown`, `>= 1`), confere que a linha marcadora aparece **uma
+  vez**, troca a linha, executa `Value.NativeQuery(Sql.Database("bdados-14r",
+  "mdb"), texto, [QtdMesesCompletosCOI = n])` e converte as colunas binárias
+  (UUIDs) em texto hexadecimal, porque o modelo não carrega binário.
+- Cada consulta de tabela: etapa `Sql` com o arquivo inteiro e etapa `Fonte`
+  chamando a função.
+
+A fonte de dados é fixa, o que mantém a atualização no Serviço pelo gateway; o
+parâmetro aparece em Configurações do modelo semântico › Parâmetros. O código M
+completo está em `powerbi/powerbi-query.md`, seção 7.
+
+### 78.4. Validação no SQL Server (29/10/2026)
+
+As seis consultas rodaram exatamente como o Power Query vai executá-las: texto
+com a linha trocada e `@QtdMesesCompletosCOI` como parâmetro `int` do
+`SqlCommand` (o que gera `sp_executesql`).
+
+| Teste | Resultado |
+|---|---|
+| 12 meses — período | 01/03/2026 a 01/10/2026 (março a setembro, limitado pelo piso) |
+| 12 — Registrados | 25.727; por mês 4.342, 3.680, 3.422, 3.483, 3.398, 3.679, 3.723 (= §75.6); SDM único |
+| 12 — Encerrados | 4.036; por mês 478, 728, 593, 612, 583, 589, 453; SDM único |
+| 12 — Satisfação | 4.036 linhas, os mesmos SDMs de Encerrados; solicitadas 2.550; respondidas 2 |
+| 12 — Diário | 214 dias, um por dia; somas 25.727 e 4.036 |
+| 12 — Por Hora | 168 linhas = 7 × 24, chave mês × hora única, horas 0–23 em todo mês; Registrados e Encerrados por mês iguais aos validados; as 168 células iguais às das consultas antigas por hora |
+| 12 — Por Membro | 1.116 linhas, chave mês × conta única; somas: Registrados 25.727, `Encerrados` 4.036, `EncerradosComoResponsavel` 4.036 |
+| 12 × saídas de 28/10 (mesmo período) | Encerrados, Satisfação, Diário e Por Membro idênticos linha a linha; no detalhe de Registrados, 25.727 linhas iguais exceto o SDM 1724090 (abaixo) |
+| 3 meses — período | 01/07/2026 a 01/10/2026 |
+| 3 × recorte jul–set do resultado com 12 | idêntico linha a linha nas seis consultas (Registrados 10.800, Encerrados 1.625; Por Hora 72 linhas; Por Membro 504 linhas; Diário 92 dias), exceto a coluna de diagnóstico `AbertoAntesDoPeriodo` em 3 chamados — correto: ela é relativa ao início do período (aberto antes de julho) |
+| 0 | a consulta falha com "QtdMesesCompletosCOI deve ser um inteiro positivo" |
+| 2.147.483.647 | igual a 12, sem erro (piso) |
+
+**SDM 1724090.** Registrado em 14/08/2026, foi transferido do COI para `NSTI
+PLAN-PROC-DOC` em 28/10/2026 às 12:03, depois da execução anterior. Continua
+Registrado, na mesma data; só a evidência mudou de `ABERTO_NO_COI_INFERIDO_GRUPO_ATUAL`
+para `ABERTO_NO_COI_CADEIA`, porque agora há evento de grupo legível. É o caso
+já documentado de "meses fechados podem mudar": as consultas leem o estado atual.
+
+### 78.5. Documentação
+
+`powerbi/powerbi-query.md` (seção 3, novo item "Parâmetro QtdMesesCompletosCOI",
+com a tabela de testes; seção 7, estrutura do Power Query e código M),
+`README.md` (consultas do painel e tabela de parâmetros de período) e
+`powerbi/documentacao-powerbi-coi.html` (seções Período e Manutenção).
+`docs/coi-calculation.md` não trata do período do Power BI e não mudou.

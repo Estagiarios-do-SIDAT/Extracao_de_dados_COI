@@ -8,7 +8,8 @@ São **6 consultas**, todas em `powerbi/`, cada uma com o nome da sua consulta d
 referência em `queries/` seguido de `_power_bi`. Cada consulta do Power BI
 aplica **a mesma regra** da sua referência; muda apenas o que é necessário para
 o uso no painel, marcado no SQL com `[POWER BI]`. O texto SQL de cada uma fica
-incorporado ao relatório, no campo **Instrução SQL** da conexão.
+incorporado ao relatório, na etapa `Sql` da sua consulta do Power Query, e o
+período vem de um único parâmetro, `QtdMesesCompletosCOI` (seções 3 e 7).
 
 As regras de cálculo — quem conta como Registrado, quem conta como Encerrado, de
 onde vem cada data, a quem se atribui cada registro e cada encerramento — estão
@@ -113,19 +114,69 @@ Registrados que o painel usa.
 ## 3. Período automático
 
 O período é calculado a cada atualização, e é **o mesmo nas 6 consultas** —
-assim o filtro Mês/Ano enxerga os mesmos meses em todas as páginas:
+assim todas as páginas enxergam os mesmos meses carregados:
 
 | Limite | Valor |
 |---|---|
-| Fim (exclusivo) | dia 1 do mês corrente, 00:00:00, horário de Brasília |
-| Início (inclusivo) | `@PBI_QuantidadeMeses` meses antes do fim, mas **nunca antes** de `@PBI_InicioMinimoBR` |
+| Fim (exclusivo) | dia 1 do mês corrente, 00:00:00, horário de Brasília (UTC−3) |
+| Início (inclusivo) | `QtdMesesCompletosCOI` meses antes do fim, mas **nunca antes** de `@PBI_InicioMinimoBR` |
 
-`@PBI_QuantidadeMeses` vale **12** e `@PBI_InicioMinimoBR` vale **01/03/2026**.
-Entram **só meses completos**: o mês em andamento fica de fora. Numa
-atualização feita em outubro de 2026, o período vai de 01/03/2026 a
-01/10/2026 — março a setembro, sete meses, limitados pelo piso. A cobertura
-cresce sozinha até 12 meses e depois anda mês a mês, sempre com os últimos 12
-meses completos.
+Entram **só meses completos**: o mês em andamento fica de fora.
+`@PBI_InicioMinimoBR` vale **01/03/2026**. Numa atualização feita em outubro de
+2026, com 12 (ou 24) meses, o período vai de 01/03/2026 a 01/10/2026 — março a
+setembro, sete meses, limitados pelo piso; com 3 meses, julho a setembro. A
+cobertura cresce sozinha até a quantidade escolhida e depois anda mês a mês.
+
+### Parâmetro `QtdMesesCompletosCOI`
+
+A quantidade de meses é **um único parâmetro do Power Query**, usado pelas seis
+consultas:
+
+| Item | Valor |
+|---|---|
+| Nome | `QtdMesesCompletosCOI` |
+| Tipo | número; aceito só inteiro positivo (1, 2, 3…) |
+| Padrão | **12** |
+| Onde mudar | Power BI Desktop: **Página Inicial › Transformar dados › Editar parâmetros**. Serviço: **Configurações do modelo semântico › Parâmetros** |
+| Efeito | na próxima atualização, as seis consultas carregam os últimos N meses completos, nunca antes de 01/03/2026 |
+
+**Parâmetro × filtro Mês/Ano.** O parâmetro define **quantos meses o modelo
+carrega**; o filtro Mês/Ano de cada página escolhe **quais dos meses carregados**
+o usuário vê. Mudar o filtro não lê o banco; mudar o parâmetro exige atualizar.
+
+**Como o valor chega ao SQL.** Cada consulta do Power BI tem, no bloco
+`[POWER BI] PERIODO AUTOMATICO`, a linha:
+
+```sql
+DECLARE @PBI_QuantidadeMeses int = 12;
+```
+
+O 12 é o valor para rodar o arquivo fora do Power BI (SSMS). No Power BI, a
+função compartilhada `Executar consulta COI` (seção 7):
+
+1. valida o parâmetro — se não for inteiro positivo, a atualização falha com a
+   mensagem "QtdMesesCompletosCOI inválido";
+2. troca essa linha, que precisa aparecer **uma única vez**, por
+   `DECLARE @PBI_QuantidadeMeses int = @QtdMesesCompletosCOI;` — se não a
+   encontrar, falha com "Consulta COI sem o marcador de período";
+3. executa o lote com `Value.NativeQuery`, passando o valor como **parâmetro SQL
+   tipado** (`sp_executesql`), e não concatenado ao texto.
+
+O SQL também se protege: `@PBI_QuantidadeMeses` nulo ou menor que 1 interrompe
+a consulta (`THROW 50001`), e o início é calculado de forma que valores muito
+grandes resultam no piso, sem estouro de data. Nada das regras de Registrados,
+Encerrados, responsáveis, tipos ou satisfação depende do parâmetro: ele só move
+o início do período.
+
+Conferido no SQL Server, executando as seis consultas exatamente como o Power
+Query executa (texto trocado + parâmetro SQL), em 29/10/2026:
+
+| Valor | Período | Resultado |
+|---|---|---|
+| 12 | mar–set/2026 | Registrados 25.727, Encerrados 4.036, pesquisas solicitadas 2.550, respondidas 2; Por Hora 168 linhas (24 por mês, sem repetição); totais iguais aos validados |
+| 3 | jul–set/2026 | cada consulta devolve exatamente o recorte de julho a setembro do resultado com 12 (Registrados 10.800, Encerrados 1.625) |
+| 0 | — | a consulta falha com a mensagem de valor inválido (conferido na consulta de Encerrados; o bloco é idêntico nas seis) |
+| 2.147.483.647 | mar–set/2026 | igual a 12: limitado pelo piso, sem erro (idem) |
 
 **Por que o piso.** Março de 2026 é o mês em que o novo COI passou a usar o
 código de fornecedor atual, o grupo alvo de Encerrados `@COI_Novo` (seção 4), e
@@ -140,8 +191,9 @@ grupo antigo até 24/03, `@COI_Novo` a partir de 08/03. O painel conta só
 ficaram no grupo antigo são do contrato anterior e não entram, como em qualquer
 mês. Registrados não depende do grupo alvo e conta março inteiro.
 
-Para mudar a cobertura, altere só `@PBI_QuantidadeMeses`, no início de cada
-consulta, **nas seis**. O piso só deve mudar junto com o grupo alvo.
+Para mudar a cobertura, mude só o parâmetro `QtdMesesCompletosCOI`; os seis
+arquivos SQL não precisam ser editados. O piso só deve mudar junto com o grupo
+alvo.
 
 ---
 
@@ -253,22 +305,86 @@ validada do COI é a de **respondidas**. A tabela de respostas é o conjunto com
 
 ## 7. Manutenção no Power Query
 
-### Onde fica o SQL
+### Estrutura
 
-**Página Inicial › Transformar dados** › selecione a consulta › em **Etapas
-aplicadas**, clique na engrenagem da etapa **Fonte** › **Opções avançadas** ›
-campo **Instrução SQL**. Depois de editar: **OK** › **Fechar e aplicar**, e
-aprove a consulta nativa quando o Power BI pedir.
+| Consulta do Power Query | Papel | Carregada no modelo |
+|---|---|---|
+| `QtdMesesCompletosCOI` | parâmetro: quantos meses completos carregar (padrão 12) | não |
+| `Executar consulta COI` | função compartilhada: valida o parâmetro, troca a linha do período e executa o SQL parametrizado | não |
+| uma consulta por tabela (seis) | etapa `Sql` com o texto **inteiro** do arquivo de `powerbi/`, e etapa `Fonte` que chama a função | sim |
+
+O texto SQL fica **dentro do relatório**, na etapa `Sql` de cada consulta — não
+há leitura de arquivo `.sql` do disco, nem caminho local. Não é preciso mudar os
+seis textos para mudar o período.
+
+A função:
+
+```powerquery
+(TextoSql as text) as table =>
+let
+    Qtd = QtdMesesCompletosCOI,
+    QtdValida =
+        if Value.Is(Qtd, type number) and Qtd >= 1 and Qtd = Number.RoundDown(Qtd)
+        then Int64.From(Qtd)
+        else error Error.Record("QtdMesesCompletosCOI inválido",
+            "Informe um número inteiro positivo de meses completos (por exemplo, 12).", Qtd),
+    Marcador = "DECLARE @PBI_QuantidadeMeses int = 12;",
+    Ocorrencias = List.Count(Text.PositionOf(TextoSql, Marcador, Occurrence.All)),
+    TextoParametrizado =
+        if Ocorrencias = 1
+        then Text.Replace(TextoSql, Marcador, "DECLARE @PBI_QuantidadeMeses int = @QtdMesesCompletosCOI;")
+        else error Error.Record("Consulta COI sem o marcador de período",
+            "A linha " & Marcador & " deve aparecer uma única vez no SQL.", Ocorrencias),
+    Fonte = Value.NativeQuery(
+        Sql.Database("bdados-14r", "mdb"),
+        TextoParametrizado,
+        [QtdMesesCompletosCOI = QtdValida]),
+    // Colunas binárias (UUIDs) não são carregáveis no modelo: viram texto hexadecimal.
+    Binarias = List.Select(Table.ColumnNames(Fonte),
+        (c) => Type.Is(Type.NonNullable(Type.TableColumn(Value.Type(Fonte), c)), type binary)),
+    Resultado = Table.TransformColumns(Fonte,
+        List.Transform(Binarias, (c) => {c, (b) => if b = null then null else Binary.ToText(b, BinaryEncoding.Hex), type nullable text}))
+in
+    Resultado
+```
+
+O parâmetro:
+
+```powerquery
+12 meta [IsParameterQuery = true, IsParameterQueryRequired = true, Type = "Number"]
+```
+
+Cada consulta de tabela:
+
+```powerquery
+let
+    Sql = "USE mdb;#(lf)SET NOCOUNT ON;#(lf)...",   // o arquivo de powerbi/ inteiro
+    Fonte = #"Executar consulta COI"(Sql)
+in
+    Fonte
+```
+
+A fonte de dados é fixa (`bdados-14r`, `mdb`), o que mantém a atualização
+compatível com o gateway no Serviço; o parâmetro só altera o valor passado ao
+SQL. Na primeira atualização depois de trocar um texto SQL, o Power BI Desktop
+pede a aprovação da consulta nativa.
+
+### Atualizar o SQL de uma consulta
+
+**Página Inicial › Transformar dados** › selecione a consulta › etapa **Sql** ›
+cole o arquivo de `powerbi/` **inteiro** no lugar do texto anterior (o editor
+avançado mostra quebras de linha como `#(lf)`). **Fechar e aplicar**. A linha
+`DECLARE @PBI_QuantidadeMeses int = 12;` precisa continuar no texto.
 
 ### Conexão
 
 | Item | Valor |
 |---|---|
-| Conector | SQL Server |
+| Conector | SQL Server, por `Value.NativeQuery` |
 | Banco de dados | `mdb` |
 | Modo | Importação |
-| Instrução SQL | o arquivo inteiro, sem selecionar trecho |
-| Adicionar colunas de relação | desmarcado |
+| SQL | o arquivo inteiro, sem selecionar trecho |
+| Parâmetro SQL | `@QtdMesesCompletosCOI` (int), vindo de `QtdMesesCompletosCOI` |
 
 Cada consulta é somente leitura e roda num único lote. Cada atualização executa
 a consulta inteira de novo e substitui os dados importados.

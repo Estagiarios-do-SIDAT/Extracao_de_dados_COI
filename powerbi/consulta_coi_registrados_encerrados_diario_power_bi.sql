@@ -40,18 +40,31 @@ SET NOCOUNT ON;
 -- codigo de fornecedor atual, o grupo alvo de Encerrados (@COI_Novo). Marco
 -- entra INTEIRO. Antes dele, os encerramentos sao do grupo antigo - outro
 -- contrato, que a regra de Encerrados nao soma -, e o painel mostraria meses
--- sem Encerrados ao lado de meses com Registrados. Para mudar a cobertura,
--- altere apenas @PBI_QuantidadeMeses; o piso so muda se mudar o grupo alvo.
+-- sem Encerrados ao lado de meses com Registrados. O piso so muda se mudar o
+-- grupo alvo.
+--
+-- @PBI_QuantidadeMeses vem do parametro QtdMesesCompletosCOI do Power Query,
+-- o MESMO nas seis consultas. O Power Query troca o 12 da linha abaixo pela
+-- referencia @QtdMesesCompletosCOI e executa o lote com esse parametro SQL
+-- (Value.NativeQuery, sp_executesql); ver powerbi/powerbi-query.md, secao 3.
+-- O 12 vale so quando o arquivo roda fora do Power BI. Nao mude o texto da
+-- linha: o Power Query a localiza por ele e falha se nao a encontrar.
 --------------------------------------------------------------------------------
 DECLARE @PBI_QuantidadeMeses int = 12;
 DECLARE @PBI_InicioMinimoBR datetime2(0) = '2026-03-01 00:00:00';
+
+IF @PBI_QuantidadeMeses IS NULL OR @PBI_QuantidadeMeses < 1
+    THROW 50001, N'[POWER BI] QtdMesesCompletosCOI deve ser um inteiro positivo.', 1;
 
 DECLARE @PBI_HojeBR date =
     CONVERT(date, DATEADD(HOUR, -3, SYSUTCDATETIME()));
 DECLARE @PBI_FimBR datetime2(0) =
     CONVERT(datetime2(0), DATEFROMPARTS(YEAR(@PBI_HojeBR), MONTH(@PBI_HojeBR), 1));
+-- Fim e piso sao dias 1: "n meses antes do fim depois do piso" equivale a
+-- "n menor que os meses entre piso e fim", e esta forma nao estoura o
+-- DATEADD quando n e muito grande.
 DECLARE @PBI_InicioBR datetime2(0) =
-    CASE WHEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR) > @PBI_InicioMinimoBR
+    CASE WHEN @PBI_QuantidadeMeses < DATEDIFF(MONTH, @PBI_InicioMinimoBR, @PBI_FimBR)
          THEN DATEADD(MONTH, -@PBI_QuantidadeMeses, @PBI_FimBR)
          ELSE @PBI_InicioMinimoBR END;
 

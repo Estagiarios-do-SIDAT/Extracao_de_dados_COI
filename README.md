@@ -113,7 +113,7 @@ A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o n
 | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | Por Membro |
 | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | Satisfação |
 
-Cada uma aplica a mesma regra da sua referência, com período automático (meses completos, até 12, a partir de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto, o resumo da satisfação e as duas por hora separadas — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
+Cada uma aplica a mesma regra da sua referência, com período automático (os últimos meses completos, quantos o parâmetro `QtdMesesCompletosCOI` do Power Query indicar — 12 por padrão —, nunca antes de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto, o resumo da satisfação e as duas por hora separadas — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
 
 A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). O conteúdo da página Documentação, para o visual HTML Content, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
 
@@ -149,7 +149,7 @@ Os nomes variam por família de consulta:
 | Registrados (`consulta_coi_registrados_*.sql`) | `@InicioBR` | `@FimBR` | `@MostrarDiagnostico` no por membro |
 | Encerrados e Encerrados por hora | `@DataInicio` | `@DataFim` | `@MostrarDiagnostico` em Encerrados |
 | Pesquisa de satisfação dos encerrados (resumo e detalhe) | `@DataInicio` | `@DataFim` | `@MostrarConferencia` no resumo |
-| Power BI (`powerbi/*_power_bi.sql`) | automático: `@PBI_QuantidadeMeses` (12) meses antes do fim, nunca antes de `@PBI_InicioMinimoBR` (01/03/2026) | dia 1 do mês corrente | as da referência |
+| Power BI (`powerbi/*_power_bi.sql`) | automático: `@PBI_QuantidadeMeses` meses antes do fim — no Power BI, o valor do parâmetro `QtdMesesCompletosCOI` (padrão 12); fora dele, 12 —, nunca antes de `@PBI_InicioMinimoBR` (01/03/2026) | dia 1 do mês corrente | as da referência |
 
 - Todas as datas são horário do Brasil (GMT-3) e o intervalo é **semiaberto**: `>= início` e `< fim`. Para março inteiro, use início `2026-03-01 00:00:00` e fim `2026-04-01 00:00:00` — nunca `23:59:59`.
 - `@TransIniBR` e `@TransFimBR`, dentro do bloco canônico, marcam a janela da renomeação das filas do COI em 18/03/2026. **Não são parâmetros de período** e não devem ser alterados.
