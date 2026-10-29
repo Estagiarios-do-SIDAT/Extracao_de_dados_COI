@@ -25477,3 +25477,239 @@ com a tabela de testes; seção 7, estrutura do Power Query e código M),
 `README.md` (consultas do painel e tabela de parâmetros de período) e
 `powerbi/documentacao-powerbi-coi.html` (seções Período e Manutenção).
 `docs/coi-calculation.md` não trata do período do Power BI e não mudou.
+
+## 79. 2026-10-29 — Figma: frames do COI viram fundos de página para o Power BI
+
+A §77 descreveu o primeiro layout, com gráficos, tabelas e números ilustrativos
+desenhados nos frames. Esta seção registra a mudança de método e as decisões de
+página tomadas depois dela. As §77.3 (filtro sincronizado) e §77.4 (Por Tipo só
+por tipo) ficam **substituídas** pelo que está aqui; o texto da §77 foi mantido.
+
+### 79.1. Método — o mesmo dos painéis Decision, Virtual e Protect4
+
+1. No Figma, cada frame tem só a **estrutura visual**: fundo institucional,
+   identidade, título, barra de navegação (com a página ativa já destacada no
+   PNG de cada página), caixa do filtro Mês/Ano, botão Limpar filtro, cartões e
+   áreas brancas vazias onde ficam os visuais.
+2. Cada frame é exportado em **PNG 4x** (5120 × 2880).
+3. No Power BI, a página de 1280 × 720 — a proporção dos frames — usa o PNG
+   como **tela de fundo**, ajuste **Ajustar** ("Alongar"), transparência 0%. É a
+   mesma configuração dos painéis de referência (`scaling: Fit`).
+4. Gráficos, tabelas, cartões com valores, segmentações e botões funcionais são
+   **visuais nativos** posicionados sobre as áreas reservadas. Botões
+   desenhados no fundo recebem botões transparentes por cima, com a ação.
+
+Nenhum gráfico, tabela ou valor entra nos PNGs. Os gráficos e tabelas
+ilustrativos continuam no arquivo como **prévia**, em camadas ocultas
+("Prévia — oculta na exportação (…)"), fora da exportação.
+
+### 79.2. O que mudou nos frames
+
+| Frame | Fundo |
+|---|---|
+| Início | título, 6 cartões de navegação, unidade gestora e fonte; novo cartão **Última atualização** (canto superior direito), com área vazia para o valor nativo |
+| Visão Geral | cartões Registrados e Encerrados sem o número (camada do valor transparente); cartão "Registrados × Encerrados" vazio |
+| Por Hora | cartão "Registrados e encerrados por hora do dia" vazio |
+| Por Membro | cartão "Registrados e encerrados por membro", com a nota do critério do fornecedor |
+| Por Tipo | **um** cartão de largura total, "Registrados e encerrados por tipo e por mês" (79.4) |
+| Satisfação | cartões Pesquisas solicitadas e respondidas sem o número; cartão "Detalhe das pesquisas" com o aviso "Pesquisa solicitada não é pesquisa respondida" |
+| Documentação | cartão de largura total vazio, para o visual HTML Content |
+
+No componente do filtro saiu a etiqueta "sincronizado entre as páginas"; a
+caixa ficou vazia (a segmentação nativa desenha o valor e a seta), o botão
+passou a "Limpar filtro", e uma propriedade de texto mostra o modo de seleção:
+"todos os meses ou um mês" (Visão Geral, Por Tipo) ou "um mês por vez" (Por
+Hora, Por Membro, Satisfação). Os cinco filtros foram alinhados à borda direita
+da barra de navegação (x = 1268).
+
+Frames preservados: mesmos nomes, posições e tamanhos (1280 × 720); auditoria
+sem nenhum elemento fora dos limites. As páginas Decision, Virtual e Protect4 só
+foram lidas. PNGs: `Painéis/COI/Assets/Layouts/` (fora do repositório, como nos
+outros painéis) e embutidos no projeto do Power BI.
+
+### 79.3. Filtros independentes
+
+A exigência de sincronizar o Mês/Ano entre as páginas foi **retirada**. Cada
+página tem a sua segmentação:
+
+| Páginas | Seleção | Padrão | Limpar filtro |
+|---|---|---|---|
+| Visão Geral, Por Tipo | **Todos os meses** ou um mês; sem seleção múltipla | Todos os meses | volta a Todos os meses |
+| Por Hora, Por Membro, Satisfação | **seleção única**: um mês | **Último mês completo** | volta ao Último mês completo |
+
+"Todos os meses" é uma opção da segmentação (tabela `Filtro Período`, §80.5).
+"Último mês completo" é o nome que o calendário dá ao mês mais recente carregado
+(coluna `Mês/Ano (seleção)`). A segmentação guarda esse nome, e não "set/2026":
+assim a seleção padrão acompanha cada atualização sem regravar o relatório.
+
+### 79.4. Por Tipo: evolução mensal
+
+Primeiro pedido: os gráficos de Por Tipo mostram a **evolução por mês**, não
+só o total de Incidentes e Solicitações. Segundo pedido, que prevalece no que
+conflita com o primeiro:
+
+- filtro com **Todos os meses** ou um mês, como na Visão Geral (não mais seleção
+  única obrigatória);
+- **dois gráficos empilhados**, na largura toda: em cima, Registrados por tipo e
+  por mês; embaixo, Encerrados por tipo e por mês. Colunas agrupadas, eixo
+  Ano › Mês/Ano (drill de Mês para Ano), séries Incidentes e Solicitações —
+  verdes para Registrados (`#106235`, `#6DBE8F`), azul-violeta para Encerrados
+  (`#25247B`, `#8E8DC8`);
+- alternância **Gráfico | Tabela**; a tabela Tipo × Registrados × Encerrados;
+- gráficos e tabela **seguem o filtro**: em todos os meses, a evolução de todo o
+  período carregado; com um mês, só ele, ainda separado por tipo.
+
+Não foi preciso SQL novo: `Chamados Registrados` tem `DataRegistroCOI`
+(`DataRegistro`) e `Tipo`, e `Chamados Encerrados` tem `Data de Encerramento` e
+`Tipo Chamado`; os dois só têm os valores Incidente e Solicitação (conferido em
+25.727 e 4.036 linhas).
+
+No Figma, o frame tem um único cartão vazio; a prévia oculta (variante
+"Gráfico" do componente "Por Tipo — Conteúdo") foi redesenhada com os dois
+gráficos mensais empilhados, março a setembro, valores ilustrativos.
+
+## 80. 2026-10-29 — painel do COI no Power BI: projeto `powerbi/painel/painel-coi.pbip`
+
+### 80.1. Ponto de partida e decisão de formato
+
+`Painéis/COI/painel-coi.pbix` (fora do repositório) tinha as seis consultas com
+**texto SQL antigo** (sem `UUID Grupo Atual` nem `MembroUUID`), as tabelas
+`documentacao-powerbi-coi` e `Atualizacao`, data/hora automática ligada, nenhuma
+medida, um relacionamento autodetectado (Satisfação ↔ Encerrados, um para um,
+nos dois sentidos) e sete páginas de 1920 × 1080 quase vazias, com nomes da
+estrutura anterior. O modelo de um `.pbix` é binário; por isso o painel foi
+construído como **projeto do Power BI** (`.pbip`): relatório em PBIR (o mesmo
+formato já usado dentro do `.pbix`) e modelo em `model.bim`, ambos texto,
+versionáveis. O `.pbix` original **não foi alterado**. Gerar um `.pbix` a
+partir do projeto é **Arquivo › Salvar como** no Desktop.
+
+Os painéis Decision, Virtual e Protect4 foram lidos só por cópias na pasta
+temporária, para reproduzir o padrão: páginas de 1280 × 720, fundo PNG com
+ajuste `Fit` e transparência 0, botões transparentes sobre os desenhados,
+indicador "Limpar filtros" e visual HTML Content (lite) na Documentação — o
+pacote desse visual foi copiado da cópia do Decision.
+
+### 80.2. Consultas e nomes
+
+| Consulta (Power Query) | Tabela | Carregada |
+|---|---|---|
+| `QtdMesesCompletosCOI` | parâmetro (§78) | não |
+| `Executar consulta COI` | função (§78) | não |
+| `consulta_coi_registrados_detalhe_power_bi` | **Chamados Registrados** | sim |
+| `consulta_coi_encerrados_power_bi` | **Chamados Encerrados** (+ `Data de Encerramento (dia)`) | sim |
+| `consulta_coi_registrados_encerrados_diario_power_bi` | **Movimentação Diária** | sim |
+| `consulta_coi_registrados_encerrados_por_hora_power_bi` | **Movimentação por Hora** (+ `MesInicio`) | sim |
+| `consulta_coi_registrados_encerrados_por_membro_power_bi` | **Movimentação por Membro** (+ `MesInicio`) | sim |
+| `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi` | **Pesquisas de Satisfação** (+ `DataEncerramento (dia)`) | sim |
+| `Atualizacao` | **Última Atualização** (M preservado: `DateTimeZone.FixedUtcNow()`, UTC−3) | sim |
+| `documentacao-powerbi-coi` | **Documentação COI** | sim |
+
+As colunas acrescentadas no Power Query são só datas derivadas (dia da data de
+encerramento; dia 1 do mês), para ligar ao calendário; nenhuma regra mudou. As
+colunas binárias (UUIDs) viram texto hexadecimal, ocultas.
+
+### 80.3. Modelo
+
+- Tabelas DAX: **Calendário COI** (do primeiro ao último `Dia` da Movimentação
+  Diária; `Mês/Ano` ordenado por `AnoMes`; `Mês/Ano (seleção)` com o mês mais
+  recente chamado "Último mês completo"; hierarquia Ano › Mês › Dia; marcada
+  como tabela de datas), **Tipo de Chamado** (Incidente, Solicitação),
+  **Filtro Período** (80.5) e **Medidas COI**.
+- Relacionamentos: calendário → cada fato pela **sua** data (registro no COI,
+  encerramento, dia, mês); tipo → Registrados e Encerrados; Filtro Período →
+  calendário. Um para muitos, um sentido, exceto Filtro Período ↔ calendário
+  (dois sentidos, só entre tabelas de datas). Nenhum relacionamento entre fatos.
+  Data/hora automática desligada.
+- 21 medidas (`powerbi/powerbi-query.md`, seção 6). `Encerrados por membro`
+  soma `EncerradosComoResponsavel`; a coluna `Encerrados` (executor) ficou
+  oculta, com descrição de que não alimenta o indicador.
+
+### 80.4. Páginas
+
+Sete páginas de 1280 × 720, cada uma com o PNG 4x do seu frame como fundo
+(ajuste `Fit`, transparência 0). Por cima, só visuais nativos:
+
+| Página | Visuais |
+|---|---|
+| Início | 6 botões transparentes sobre os cartões (navegação); cartão **Última atualização** (`dd/mm/aaaa hh:mm`, da consulta Power Query) |
+| Visão Geral | cartões Registrados e Encerrados; **Gráfico**: colunas agrupadas Ano › Mês/Ano › Data, com drill nativo; **Tabela**: chamados Registrados ou Encerrados |
+| Por Hora | **Gráfico** 00h–23h, Registrados **ou** Encerrados; **Tabela** Hora × Registrados × Encerrados com total |
+| Por Membro | **Gráfico** de barras horizontais agrupadas e **Tabela** Membro × Registrados × Encerrados (critério do fornecedor) |
+| Por Tipo | **Gráficos** empilhados, na largura toda: Registrados e Encerrados por tipo e por mês (Ano › Mês/Ano), Incidentes e Solicitações; **Tabela** Tipo × Registrados × Encerrados |
+| Satisfação | cartões Pesquisas solicitadas e Pesquisas respondidas; tabela por chamado |
+| Documentação | visual HTML Content (lite) com `Documentação COI[HTML]` |
+
+Navegação: botões transparentes, com ação de página, sobre os botões
+desenhados no fundo; a página ativa já vem destacada no PNG de cada página.
+Gráfico | Tabela e Registrados | Encerrados: 10 indicadores de exibição
+(`suppressData`, só a página atual, só os visuais da alternância), em grupos
+por página; os botões da opção ativa são azul-violeta, os demais cinza-claros.
+Os títulos dos visuais mostram o período exibido ("Mês: set/2026" ou "Todos os
+meses: mar/2026 a set/2026").
+
+### 80.5. Filtros
+
+| Páginas | Segmentação | Padrão | Limpar filtro |
+|---|---|---|---|
+| Visão Geral, Por Tipo | `Filtro Período[Período]`, seleção única | **Todos os meses** | indicador que volta a Todos os meses |
+| Por Hora, Por Membro, Satisfação | `Calendário COI[Mês/Ano (seleção)]`, seleção única | **Último mês completo** | indicador que volta ao Último mês completo |
+
+Sem sincronização entre páginas. Por Tipo: gráficos e tabela seguem o filtro.
+
+**Problema encontrado.** A primeira versão deixava Visão Geral e Por Tipo sem
+seleção para representar "todos os meses". Na prática, a **seleção única** do
+Power BI escolhe sempre um item: as duas páginas abriram em set/2026. Solução:
+a tabela `Filtro Período`, com cada dia do calendário duas vezes — uma com o
+seu Mês/Ano e outra com "Todos os meses" —, ligada ao calendário nos dois
+sentidos. "Todos os meses" é então um valor selecionável, padrão e alvo do
+Limpar filtro. Conferido: com "Todos os meses", 25.727 Registrados e 4.036
+Encerrados (sem duplicar nada); com jun/2026, 3.483 e 612.
+
+**Limitação real.** A segmentação nativa não impede o usuário de desmarcar o
+item selecionado clicando nele de novo; nesse caso a página mostra todos os
+dias até nova escolha ou Limpar filtro. Não há configuração nativa que obrigue
+a seleção nesse visual.
+
+### 80.6. Atualização no Desktop
+
+A primeira atualização pede a **aprovação da consulta nativa** de cada uma das
+seis consultas (o diálogo já informa "Os parâmetros desta consulta:
+QtdMesesCompletosCOI"). A aprovação é do usuário. Disparada pelo motor
+(XMLA), a atualização ficou parada esperando o diálogo e não retomou depois da
+aprovação; foi cancelada e repetida, e então rodou sem perguntas, porque o
+Power BI guarda as aprovações. Atualização completa: cerca de 380 segundos.
+
+### 80.7. Validação (29/10/2026, dados de março a setembro de 2026)
+
+Consultas DAX no modelo carregado, conferidas contra as saídas SQL da §78:
+
+| Conferência | Resultado |
+|---|---|
+| Tabelas | 12 prontas, sem erro; Calendário com 214 dias; Filtro Período com 8 opções, "Todos os meses" primeiro |
+| Registrados | 25.727 linhas = 25.727 SDMs distintos = `[Registrados]` = soma diária = soma por hora = soma por membro |
+| Encerrados | 4.036 linhas = 4.036 SDMs = `[Encerrados]` = soma diária = soma por hora = `[Encerrados por membro]` (EncerradosComoResponsavel) = linhas da Satisfação |
+| Por mês | Registrados 4.342, 3.680, 3.422, 3.483, 3.398, 3.679, 3.723; Encerrados 478, 728, 593, 612, 583, 589, 453 — iguais em todas as medidas |
+| Mês × tipo | as 14 células iguais ao SQL (ex.: mar/2026 Incidente 918 / 96; set/2026 Solicitação 3.065 / 416) |
+| Por hora, set/2026 | as 24 horas iguais ao SQL |
+| Por membro, jun/2026 | os 5 maiores encerramentos iguais ao SQL (maior: 56) |
+| Satisfação | solicitadas 2.550 e respondidas 2 no total; por mês, iguais ao SQL (set/2026: 322 e 0) |
+| Integridade | nenhuma linha sem data no calendário; nenhum tipo fora da dimensão |
+| Última atualização | data e hora de Brasília da atualização (ex.: 29/10/2026 17:33) |
+| Último mês completo | set/2026 |
+
+Conferência visual das sete páginas no Desktop: fundos alinhados aos visuais,
+navegação desenhada com a página ativa, filtros com o padrão certo (Todos os
+meses ou Último mês completo), gráficos e tabelas com os valores acima, Por
+Tipo com os dois gráficos mensais empilhados, Documentação com o HTML.
+Os indicadores (15, em 5 grupos) carregaram sem erro, no formato de exibição
+que o próprio Desktop usa (`display.mode = hidden`). O clique nos botões não
+foi exercitado no Desktop: no modo de edição a ação exige Ctrl+clique, e o
+teste exigiria controlar o mouse do usuário.
+
+### 80.8. Pendências
+
+- Salvar como `.pbix` (Arquivo › Salvar como) e publicar no espaço de trabalho;
+  no Serviço, configurar a credencial da fonte `bdados-14r;mdb` no gateway.
+- Exercitar os botões Gráfico | Tabela, Registrados | Encerrados e Limpar filtro
+  com Ctrl+clique (Desktop) ou no Serviço.
+- `Painéis/COI/painel-coi.pbix`, a versão anterior, continua como estava.

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmarksMetadata/1.0.0/schema.json",
+  "items": [
+    {
+      "name": "a9969b96a035dbd4ed43",
+      "displayName": "Visão Geral",
+      "children": [
+        "ea17c4b7e559a7c81f23",
+        "705e19fb57815cc26e28",
+        "d1196d8e7e3ac455c138",
+        "b21779459cd5cbc6448c"
+      ]
+    },
+    {
+      "name": "4948b5bf3bc79a2ae8e8",
+      "displayName": "Por Hora",
+      "children": [
+        "410dc6d48f1e599344dc",
+        "448139866cd88a3ec9c4",
+        "ecad15e2b2bf3e358240",
+        "c041df08928a7fbfc1d0"
+      ]
+    },
+    {
+      "name": "60d7194ec0cc36f72d81",
+      "displayName": "Por Membro",
+      "children": [
+        "1fe89597563100a10597",
+        "5a1e04b0f3e617432411",
+        "11e9cdf4b90687387929"
+      ]
+    },
+    {
+      "name": "006d6ce8397d3168dc3d",
+      "displayName": "Por Tipo",
+      "children": [
+        "ac15b5be3fda1ba5ee65",
+        "971d84681c104a2403ef",
+        "886c838757fbf66db4da"
+      ]
+    },
+    {
+      "name": "066c133abccc5cdfd72b",
+      "displayName": "Satisfação",
+      "children": [
+        "a128710b10660edf725e"
+      ]
+    }
+  ]
+}

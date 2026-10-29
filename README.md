@@ -100,7 +100,7 @@ Com a mesma população e a mesma conferência do grupo alvo:
 
 ### Painel
 
-O painel tem sete páginas: **Início** (navegação), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**.
+O painel tem sete páginas: **Início** (navegação e última atualização), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**. O projeto do Power BI está em [`powerbi/painel/`](powerbi/painel/) (`painel-coi.pbip`): modelo, relatório e os fundos das páginas, exportados do Figma; a montagem está na seção 6 de [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md).
 
 A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
 

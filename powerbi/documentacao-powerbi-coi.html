@@ -8,7 +8,7 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <p style='margin:0 0 12px 0;color:#57606a'>O que o painel mede, de onde vêm os dados, quais regras definem cada número e como conferir o resultado.</p>
 
 <div style='background:#eef5fc;border-left:4px solid #0b5cad;padding:10px 12px;margin:0 0 16px 0'>
-<b>Em uma linha:</b> o painel mede a <b>volumetria</b> do COI — quantos chamados <b>entram</b> no COI (Registrados) e quantos o COI <b>encerra</b> (Encerrados) — nos <b>meses completos</b> a partir de março de 2026, até 12 meses. São <b>6 consultas</b> SQL, cada uma com a mesma regra da sua consulta de referência.
+<b>Em uma linha:</b> o painel mede a <b>volumetria</b> do COI — quantos chamados <b>entram</b> no COI (Registrados) e quantos o COI <b>encerra</b> (Encerrados) — nos <b>meses completos</b> a partir de março de 2026 — até 12 meses, ou a quantidade definida no parâmetro <b>QtdMesesCompletosCOI</b>. São <b>6 consultas</b> SQL, cada uma com a mesma regra da sua consulta de referência.
 </div>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>1. Indicadores</h2>
@@ -56,30 +56,41 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>survey, survey_question, survey_answer</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Pesquisas de satisfação e a opção escolhida</td></tr>
 </table>
 
-<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>4. Consultas do painel</h2>
+<h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>4. Consultas e tabelas do painel</h2>
 <table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
-<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Consulta</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Uma linha por</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Páginas</th></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado registrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados diário</td><td style='border:1px solid #d0d7de;padding:4px 6px'>dia, inclusive sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês), as duas séries na mesma linha</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e conta</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td></tr>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Tabela no Power BI</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Consulta SQL</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Uma linha por</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Páginas</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Chamados Registrados</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado registrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Chamados Encerrados</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral, Por Tipo</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Movimentação Diária</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados diário</td><td style='border:1px solid #d0d7de;padding:4px 6px'>dia, inclusive sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Movimentação por Hora</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e hora (24 por mês)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Movimentação por Membro</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Registrados × Encerrados por membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>mês e conta</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Pesquisas de Satisfação</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação — detalhe</td><td style='border:1px solid #d0d7de;padding:4px 6px'>chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Última Atualização</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>— (Power Query: data e hora da atualização, Brasília)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>atualização</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Início</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Documentação COI</b></td><td style='border:1px solid #d0d7de;padding:4px 6px'>— (este texto)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>documento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td></tr>
 </table>
-<p>Cada consulta do painel aplica a mesma regra da sua consulta de referência; muda só o período, que é automático. Consultas de auditoria e de conciliação com o fornecedor (validação, por evidência, por registrador, membros, contas técnicas, universo bruto) não alimentam o painel e são usadas fora dele.</p>
+<p>Cada consulta do painel aplica a mesma regra da sua consulta de referência; muda só o período, que é automático. O modelo tem ainda o <b>Calendário COI</b> (um dia por linha, do primeiro ao último dia carregados) e <b>Tipo de Chamado</b> (Incidente, Solicitação). O calendário filtra cada tabela pela <b>sua</b> data: Registrados pela data de registro no COI, Encerrados e Satisfação pela data de encerramento, Por Hora e Por Membro pelo mês da linha. Nenhum relacionamento liga Registrados a Encerrados, e nenhum soma o mesmo chamado duas vezes. Consultas de auditoria e de conciliação com o fornecedor (validação, por evidência, por registrador, membros, contas técnicas, universo bruto) não alimentam o painel.</p>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>5. Páginas</h2>
 <table style='border-collapse:collapse;width:100%;margin:6px 0 10px 0'>
-<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Página</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Finalidade</th></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Início</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Navegação para as demais páginas</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Totais de Registrados e Encerrados; gráfico de colunas com detalhamento Ano › Mês › Dia; lista dos chamados, Registrados ou Encerrados</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Em que hora do dia os chamados entram ou são encerrados; tabela com as 24 horas, inclusive as sem movimento</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Quantos chamados cada conta registrou e encerrou, com a classificação da conta</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Tipo</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Incidentes e Solicitações, em Registrados e em Encerrados</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Quantidade de pesquisas e o detalhe por chamado encerrado</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Este conteúdo: indicadores, regras, fontes, consultas e funcionamento do painel</td></tr>
+<tr style='background:#f6f8fa'><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Página</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>O que mostra</th><th style='text-align:left;border:1px solid #d0d7de;padding:4px 6px'>Filtro Mês/Ano</th></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Início</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Navegação para as demais páginas e a data e hora da <b>Última atualização</b> dos dados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>—</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Totais de Registrados e Encerrados; <b>Gráfico</b>: colunas agrupadas com Ano › Mês › Dia e drill; <b>Tabela</b>: a lista dos chamados, Registrados ou Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Todos os meses</b> ou um mês</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráfico</b> das 24 horas, Registrados ou Encerrados; <b>Tabela</b> Hora × Registrados × Encerrados, inclusive horas sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráfico</b> de barras e <b>Tabela</b> Membro × Registrados × Encerrados (Encerrados pelo critério do fornecedor)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Tipo</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráficos</b>: Registrados e Encerrados por tipo e por mês, empilhados, com Incidentes e Solicitações em cada mês; <b>Tabela</b> Tipo × Registrados × Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Todos os meses</b> ou um mês</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Pesquisas solicitadas, pesquisas respondidas e o detalhe por chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Este conteúdo</td><td style='border:1px solid #d0d7de;padding:4px 6px'>—</td></tr>
 </table>
-<p>As seis consultas usam o <b>mesmo período</b> e trazem o mês de cada linha, o que permite um único filtro <b>Mês/Ano</b> para as cinco páginas analíticas. A sincronização do filtro, os relacionamentos e as medidas são configurados no modelo do Power BI.</p>
+<p style='margin-bottom:2px'><b>Filtros e interações</b></p>
+<ul style='margin-top:2px'>
+<li>O filtro Mês/Ano de cada página é <b>independente</b>: escolher um mês numa página não muda as outras.</li>
+<li><b>Visão Geral e Por Tipo</b>: o filtro oferece <b>Todos os meses</b> (padrão) ou um mês; não há seleção de vários meses. <b>Limpar filtro</b> volta a Todos os meses.</li>
+<li><b>Por Hora, Por Membro e Satisfação</b>: seleção única, sempre um mês. A página abre no <b>Último mês completo</b>, nome dado ao mês mais recente carregado, que acompanha cada atualização; <b>Limpar filtro</b> volta a ele. Os demais meses aparecem como mês/ano.</li>
+<li><b>Por Tipo</b>: em todos os meses, os dois gráficos mostram a evolução mensal; com um mês escolhido, mostram só esse mês, ainda separado em Incidentes e Solicitações. A tabela segue o mesmo filtro.</li>
+<li><b>Gráfico | Tabela</b> (e Registrados | Encerrados) trocam o que a página mostra, sem mudar o filtro.</li>
+<li>No gráfico da Visão Geral, os botões do canto do visual sobem ou descem o nível: Ano, Mês, Dia. Os gráficos de Por Tipo estão no nível Mês e podem subir para Ano.</li>
+<li>O título de cada visual informa o período exibido: o mês escolhido ou o intervalo de meses.</li>
+</ul>
 
 <h2 style='font-size:16px;color:#0b3d6b;border-bottom:1px solid #d0d7de;padding-bottom:4px'>6. Período</h2>
 <ul style='margin-top:4px'>
