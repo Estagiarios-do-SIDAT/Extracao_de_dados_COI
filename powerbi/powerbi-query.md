@@ -299,6 +299,7 @@ acompanhe cada atualização sem regravar o relatório.
 |---|---|
 | `Registrados` | linhas de `Chamados Registrados` (0 se vazio) |
 | `Encerrados` | linhas de `Chamados Encerrados` (0 se vazio) |
+| `Registrados por tipo`, `Encerrados por tipo` | as mesmas contagens sem completar com zero — Por Tipo: com um mês escolhido, os outros meses saem do eixo |
 | `Registrados no dia`, `Encerrados no dia` | soma das colunas da `Movimentação Diária` — gráfico da Visão Geral |
 | `Registrados por hora`, `Encerrados por hora` | soma das colunas da `Movimentação por Hora` |
 | `Registrados por membro` | soma de `Registrados` da `Movimentação por Membro` |
@@ -307,6 +308,12 @@ acompanhe cada atualização sem regravar o relatório.
 | `Pesquisas respondidas` | chamados com `StatusSatisfacao = Com satisfação` |
 | `Última atualização` | `MAX(UltimaAtualizacao)` no formato `dd/mm/aaaa hh:mm` |
 | `Período exibido` e `Título …` | texto do mês ou do intervalo exibido, para os títulos dos visuais |
+| `AnoMes exibido`, `Mês exibido` | o mês das páginas de mês único: o selecionado ou, se não houver seleção, o **último mês carregado** — nunca todos os meses |
+| `Registrados por hora no mês`, `Encerrados por hora no mês` | as medidas por hora restritas ao mês exibido — página Por Hora |
+| `Registrados por membro no mês`, `Encerrados por membro no mês` | as medidas por membro restritas ao mês exibido — página Por Membro; Encerrados por `EncerradosComoResponsavel` |
+| `Pesquisas respondidas no mês` | `Pesquisas respondidas` no mês exibido — cartão da página Satisfação, a mesma população da tabela |
+| `Avaliação no mês exibido` | 1 para o chamado encerrado no mês exibido — filtro da tabela da página Satisfação |
+| `Mensagem sem avaliações` | "Nenhuma avaliação registrada em …" quando o mês exibido não tem resposta |
 
 ### Páginas
 
@@ -320,10 +327,10 @@ botões transparentes por cima, com a ação correspondente.
 |---|---|---|
 | Início | 6 áreas clicáveis (navegação) e o cartão **Última atualização** | — |
 | Visão Geral | cartões Registrados e Encerrados; **Gráfico**: colunas agrupadas `Registrados no dia` × `Encerrados no dia` com eixo Ano › Mês/Ano › Data (drill nativo); **Tabela**: Registrados (`SDM`, `DataRegistroCOI`, `Tipo`, `Categoria`, `RegistradorNome`, `Resumo`) ou Encerrados (`SDM`, `Data de Encerramento`, `Tipo Chamado`, `Símbolo`, `Responsável`, `Resumo`) | todos os meses ou um mês |
-| Por Hora | **Gráfico**: colunas `HoraLabel` (00h–23h) × `Registrados por hora` **ou** × `Encerrados por hora`; **Tabela**: Hora × Registrados × Encerrados, com total | um mês |
-| Por Membro | **Gráfico**: barras horizontais agrupadas `Membro` × `Registrados por membro` e `Encerrados por membro` (rótulo **Encerrados**); **Tabela**: Membro × Registrados × Encerrados | um mês |
-| Por Tipo | **Gráficos**, empilhados e na largura toda: colunas agrupadas Ano › Mês/Ano × `Registrados` (em cima) e × `Encerrados` (embaixo), com legenda `Tipo de Chamado[Tipo]`; **Tabela**: Tipo × Registrados × Encerrados | todos os meses ou um mês |
-| Satisfação | cartões Pesquisas solicitadas e Pesquisas respondidas; tabela `SDM`, `DataEncerramento`, `TipoChamado`, `PesquisaSolicitada`, `StatusSatisfacao`, `RespostaSatisfacao`, `DataPesquisa` | um mês |
+| Por Hora | **Gráfico**: colunas `HoraLabel` (00h–23h) × `Registrados por hora no mês` **ou** × `Encerrados por hora no mês`; **Tabela**: Hora × Registrados × Encerrados, com total | um mês |
+| Por Membro | **Tabela** única: `Membro` × `Registrados por membro no mês` × `Encerrados por membro no mês` (rótulo **Encerrados**), com total, ordenada por Registrados; todas as contas com movimento no mês, inclusive Fora do grupo COI | um mês |
+| Por Tipo | **Gráficos**, empilhados e na largura toda: colunas agrupadas Ano › Mês/Ano × `Registrados por tipo` (em cima) e × `Encerrados por tipo` (embaixo), com legenda `Tipo de Chamado[Tipo]`; **Tabela**: Tipo × Registrados × Encerrados | todos os meses ou um mês |
+| Satisfação | cartão **Pesquisas respondidas** (`Pesquisas respondidas no mês`); tabela das **avaliações registradas**: `SDM`, `DataEncerramento`, `TipoChamado`, `PesquisaSolicitada`, `RespostaSatisfacao`, `DataPesquisa`, com filtros do visual `StatusSatisfacao = Com satisfação` e `Avaliação no mês exibido = 1`; mensagem quando o mês não tem avaliação | um mês |
 | Documentação | visual **HTML Content (lite)** com `Documentação COI[HTML]` | — |
 
 ### Filtros e alternâncias
@@ -337,13 +344,17 @@ botões transparentes por cima, com a ação correspondente.
   escolhe um item: sem ela, a página abriria num mês.
 - **Por Hora, Por Membro e Satisfação** — **Seleção única** sobre
   `Mês/Ano (seleção)`, gravada em **Último mês completo**. **Limpar filtro** é um
-  indicador que reaplica essa seleção. Limitação real: a segmentação nativa não
-  impede que o usuário desmarque o mês clicando nele de novo; nesse caso a página
-  mostra todos os meses até nova escolha ou até **Limpar filtro**.
+  indicador que reaplica essa seleção. O padrão é dinâmico em duas camadas:
+  1. o rótulo **Último mês completo** é recalculado a cada atualização — é sempre
+     o mês mais recente carregado, então a seleção gravada acompanha os meses
+     novos sem regravar o relatório;
+  2. os visuais usam as medidas "… no mês", que filtram pelo `AnoMes exibido`:
+     se nenhuma opção estiver selecionada, valem para o último mês carregado,
+     nunca para a soma de todos os meses.
 - **Por Tipo** — com todos os meses, os dois gráficos mostram a evolução mensal
   de Incidentes e Solicitações; com um mês, só esse mês, ainda por tipo. Gráficos
   e tabela seguem o mesmo filtro (interações padrão).
-- **Gráfico | Tabela** (Visão Geral, Por Hora, Por Membro, Por Tipo) e
+- **Gráfico | Tabela** (Visão Geral, Por Hora, Por Tipo) e
   **Registrados | Encerrados** (tabela da Visão Geral, gráfico de Por Hora) são
   indicadores de exibição: mostram e ocultam visuais, sem guardar dados, e não
   alteram o filtro. Os botões da opção ativa aparecem preenchidos em azul-violeta.
@@ -370,10 +381,13 @@ duas colunas respondem perguntas diferentes:
 | Pesquisas **solicitadas** pelo SDM | `PesquisaSolicitada` = `Sim` | 2.550 |
 | Encerrados no período | todas as linhas | 4.036 |
 
-A página Satisfação mostra as duas em cartões separados, **Pesquisas
-solicitadas** e **Pesquisas respondidas**; a regra validada do COI é a de
-**respondidas**. As respostas estão nas linhas com `RespostaSatisfacao`
-preenchida.
+A página Satisfação é a das **avaliações registradas**: o cartão Pesquisas
+respondidas e a tabela mostram só os chamados com `StatusSatisfacao` = `Com
+satisfação` no mês. A filtragem é **do visual**: `StatusSatisfacao` continua
+igual na consulta e no modelo, os chamados "Sem satisfação" continuam na tabela
+`Pesquisas de Satisfação`, e a medida `Pesquisas solicitadas` continua no modelo,
+sem cartão na página. Em agosto de 2026, por exemplo, a tabela mostra os SDMs
+1719286 (Bom) e 1725655 (Ótimo).
 
 ---
 

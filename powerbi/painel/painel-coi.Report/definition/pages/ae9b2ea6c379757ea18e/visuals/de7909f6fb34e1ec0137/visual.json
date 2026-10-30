@@ -42,11 +42,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Encerrados por hora"
+                  "Property": "Encerrados por hora no mês"
                 }
               },
-              "queryRef": "Medidas COI.Encerrados por hora",
-              "nativeQueryRef": "Encerrados por hora",
+              "queryRef": "Medidas COI.Encerrados por hora no mês",
+              "nativeQueryRef": "Encerrados por hora no mês",
               "displayName": "Encerrados"
             }
           ]
@@ -282,7 +282,22 @@
             }
           },
           "selector": {
-            "metadata": "Medidas COI.Encerrados por hora"
+            "metadata": "Medidas COI.Encerrados por hora no mês"
+          }
+        },
+        {
+          "properties": {
+            "defaultColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#25247B'"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       ]

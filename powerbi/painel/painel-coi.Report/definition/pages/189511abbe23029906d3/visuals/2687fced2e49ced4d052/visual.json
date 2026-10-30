@@ -57,11 +57,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Registrados"
+                  "Property": "Registrados por tipo"
                 }
               },
-              "queryRef": "Medidas COI.Registrados",
-              "nativeQueryRef": "Registrados",
+              "queryRef": "Medidas COI.Registrados por tipo",
+              "nativeQueryRef": "Registrados por tipo",
               "displayName": "Registrados"
             }
           ]

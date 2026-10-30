@@ -57,11 +57,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Encerrados"
+                  "Property": "Encerrados por tipo"
                 }
               },
-              "queryRef": "Medidas COI.Encerrados",
-              "nativeQueryRef": "Encerrados",
+              "queryRef": "Medidas COI.Encerrados por tipo",
+              "nativeQueryRef": "Encerrados por tipo",
               "displayName": "Encerrados"
             }
           ]

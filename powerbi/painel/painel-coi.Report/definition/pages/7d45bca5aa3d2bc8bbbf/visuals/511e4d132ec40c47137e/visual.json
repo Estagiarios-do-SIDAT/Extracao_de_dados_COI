@@ -38,11 +38,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Registrados por membro"
+                  "Property": "Registrados por membro no mês"
                 }
               },
-              "queryRef": "Medidas COI.Registrados por membro",
-              "nativeQueryRef": "Registrados por membro",
+              "queryRef": "Medidas COI.Registrados por membro no mês",
+              "nativeQueryRef": "Registrados por membro no mês",
               "displayName": "Registrados"
             },
             {
@@ -53,11 +53,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Encerrados por membro"
+                  "Property": "Encerrados por membro no mês"
                 }
               },
-              "queryRef": "Medidas COI.Encerrados por membro",
-              "nativeQueryRef": "Encerrados por membro",
+              "queryRef": "Medidas COI.Encerrados por membro no mês",
+              "nativeQueryRef": "Encerrados por membro no mês",
               "displayName": "Encerrados"
             }
           ]
@@ -73,7 +73,7 @@
                     "Entity": "Medidas COI"
                   }
                 },
-                "Property": "Registrados por membro"
+                "Property": "Registrados por membro no mês"
               }
             },
             "direction": "Descending"
@@ -177,17 +177,17 @@
                 }
               }
             },
-            "outline": {
-              "expr": {
-                "Literal": {
-                  "Value": "'None'"
-                }
-              }
-            },
             "wordWrap": {
               "expr": {
                 "Literal": {
                   "Value": "true"
+                }
+              }
+            },
+            "autoSizeColumnWidth": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
                 }
               }
             }
@@ -285,7 +285,50 @@
           }
         }
       ],
-      "columnWidth": []
+      "columnWidth": [
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "692.4D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Movimentação por Membro.Membro"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "230.8D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Medidas COI.Registrados por membro no mês"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "230.8D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Medidas COI.Encerrados por membro no mês"
+          }
+        }
+      ]
     },
     "visualContainerObjects": {
       "background": [
@@ -459,6 +502,5 @@
       ]
     },
     "drillFilterOtherVisuals": true
-  },
-  "isHidden": true
+  }
 }

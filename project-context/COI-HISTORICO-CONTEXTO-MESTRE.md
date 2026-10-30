@@ -25713,3 +25713,178 @@ teste exigiria controlar o mouse do usuário.
 - Exercitar os botões Gráfico | Tabela, Registrados | Encerrados e Limpar filtro
   com Ctrl+clique (Desktop) ou no Serviço.
 - `Painéis/COI/painel-coi.pbix`, a versão anterior, continua como estava.
+
+## 81. 2026-10-29 (2ª) — correções finais do painel: Satisfação, Por Membro só tabela, mês padrão dinâmico, testes de interação e `.pbix`
+
+Continuação da §80, sobre o mesmo projeto (`powerbi/painel/painel-coi.pbip`).
+Nenhuma consulta SQL, regra ou coluna mudou; `StatusSatisfacao` continua igual na
+consulta, no Power Query e no modelo.
+
+### 81.1. Estado encontrado
+
+O Desktop tinha gravado o projeto às 19:31–19:37, depois do commit `9891612`, no
+formato dele: `.platform` nos dois itens, `.pbi/editorSettings.json`, JSON
+normalizado e, no relatório, os testes do usuário — Por Membro na alternância
+Tabela, Por Hora em mar/2026, Satisfação em ago/2026, a coluna "Situação da
+pesquisa" já retirada da tabela de Satisfação (sem o filtro "Com satisfação") e
+"Seleção única" desligada na segmentação de Por Membro. Esse estado mostrou que a
+alternância de Por Membro **funcionava ao clique**. As seleções de teste foram
+substituídas pelas definições desta seção.
+
+A gravação também mostrou o que o Desktop **descarta**, e o gerador passou a não
+escrever: `fontSize` nos itens da segmentação (o nome é `textSize`), `outline:
+'None'`, `cardTitle` no cartão de várias linhas e o pacote do visual HTML Content
+(lite): por ser da AppSource, o projeto guarda só a referência em
+`publicCustomVisuals`, e o Desktop o obtém ao abrir (conferido: a Documentação
+renderiza sem o pacote local).
+
+### 81.2. Satisfação
+
+| Item | Implementação |
+|---|---|
+| Cartão Pesquisas solicitadas | **retirado** da página. A medida `Pesquisas solicitadas` e a coluna `PesquisaSolicitada` continuam no modelo |
+| Cartão Pesquisas respondidas | mantido, na largura toda, com `Pesquisas respondidas no mês`: chamados com `StatusSatisfacao = Com satisfação` no mês exibido — a mesma população da tabela |
+| Tabela | "Avaliações registradas": SDM, Encerramento, Tipo, Pesquisa solicitada, Avaliação, Data da resposta. Sem a coluna visual "Situação da pesquisa" |
+| Filtro da tabela | **filtros do próprio visual**: `StatusSatisfacao` = "Com satisfação" e `Avaliação no mês exibido` = 1. Os chamados "Sem satisfação" continuam na tabela `Pesquisas de Satisfação` |
+| Mês sem avaliação | mensagem "Nenhuma avaliação registrada em …" sob o cabeçalho da tabela |
+| Filtro Mês/Ano | um mês, padrão Último mês completo; Limpar filtro volta a ele |
+
+### 81.3. Por Membro
+
+Só a tabela Membro × Registrados × Encerrados, na largura toda, com total e
+ordenada por Registrados. Saíram o gráfico de barras, os botões Gráfico | Tabela
+e os dois indicadores dessa alternância. Encerrados = `Encerrados por membro no
+mês` (soma de `EncerradosComoResponsavel`, critério do fornecedor); a coluna
+`Encerrados` (executor) continua oculta, só para auditoria. Nenhuma conta é
+excluída por `TipoConta`: em jun/2026, 144 contas com movimento, 121 delas "Fora
+do grupo COI".
+
+### 81.4. Filtros e mês padrão dinâmico
+
+| Página | Segmentação | Padrão | Limpar filtro |
+|---|---|---|---|
+| Início, Documentação | — | — | — |
+| Visão Geral, Por Tipo | `Filtro Período[Período]`, seleção única | Todos os meses | Todos os meses |
+| Por Hora, Por Membro, Satisfação | `Calendário COI[Mês/Ano (seleção)]`, seleção única | Último mês completo | Último mês completo |
+
+Independentes, sem sincronização. O padrão das três páginas de mês único é
+dinâmico em duas camadas, sem depender de uma seleção fixa num indicador:
+
+1. **rótulo recalculado** — `Mês/Ano (seleção)` chama "Último mês completo" o
+   mês mais recente carregado a cada atualização; a seleção gravada (no visual e
+   no Limpar filtro) é esse rótulo, não um mês;
+2. **salvaguarda nas medidas** — os visuais dessas páginas usam medidas "… no
+   mês" que filtram por `AnoMes exibido` = `MAX(Calendário[AnoMes])` no contexto:
+   o mês selecionado ou, sem seleção, o último mês carregado. Nunca somam vários
+   meses.
+
+Conferido com outros períodos: com o calendário restrito a jul/2026 (simulação de
+uma carga que termina em julho), sem seleção, as páginas mostram jul/2026 (Por
+Hora 3.398 registrados; Por Membro 583 encerrados), e a mesma fórmula do
+calendário dá "Último mês completo" a jul/2026.
+
+Por Tipo: as medidas `Registrados por tipo` e `Encerrados por tipo` (sem
+completar com zero) fazem o eixo mostrar só o mês escolhido; antes, os outros
+meses apareciam com colunas zeradas.
+
+### 81.5. Testes no Power BI Desktop
+
+Feitos no próprio Desktop, sem mouse nem teclado: troca de página e seleção na
+segmentação por UI Automation; aplicação dos indicadores pelo modo **Exibição**
+do painel Indicadores (o mesmo estado que o botão aplica).
+
+| Teste | Resultado |
+|---|---|
+| Visão Geral — Gráfico → Tabela – Registrados → Tabela – Encerrados | ok: troca de visual e de botões ativos; filtro Todos os meses mantido |
+| Por Hora — Gráfico – Registrados / Gráfico – Encerrados / Tabela | ok; tabela com 24 horas e total 3.723 / 453 |
+| Por Tipo — Gráficos / Tabela | ok; tabela 4.904 / 20.823 (25.727) e 688 / 3.348 (4.036) |
+| Por Hora: jun/2026 → Limpar filtro | volta ao Último mês completo (set/2026; 11h = 1.031) |
+| Por Tipo: jun/2026 → Limpar filtro | volta a Todos os meses, evolução completa |
+| Segmentação depois do Limpar filtro | **defeito encontrado e corrigido** (81.6) |
+| Satisfação, ago/2026 | só SDM 1719286 (Bom) e 1725655 (Ótimo); cartão 2 |
+| Satisfação, set/2026 | cartão 0 e a mensagem de mês sem avaliação |
+| Filtros independentes | Visão Geral em Todos os meses com Por Hora no último mês, Satisfação em ago/2026 e Por Tipo em jun/2026 |
+| Fiação dos botões (estática) | 48 de navegação apontam para páginas existentes; 15 de indicador apontam para indicadores da própria página |
+
+**Não exercitado pela automação**: o clique nos botões desenhados (navegação,
+Gráfico | Tabela, Limpar filtro) e os botões de drill do gráfico. No Desktop, a
+ação de botão exige Ctrl+clique e os botões de drill só aparecem ao passar o
+mouse — o teste exigiria controlar o mouse e o teclado do usuário. A alternância
+de Por Membro foi exercitada pelo usuário (81.1), e o efeito dos indicadores foi
+conferido acima. Fica o roteiro de conferência manual (81.8).
+
+### 81.6. Problemas encontrados e correções
+
+- **Limpar filtro restringia a segmentação.** O indicador gravava o mês também
+  em `filters.byExpr`, que é o filtro **do visual**: depois de aplicado, a lista
+  da segmentação mostrava só "Último mês completo". Corrigido: a escolha fica só
+  em `objects.general.filter`, como nos indicadores criados pelo Desktop nos
+  painéis de referência. Conferido: a lista volta a ter as 7 opções.
+- **Cor do gráfico de Encerrados por hora.** Em gráfico de uma série, a cor é
+  `defaultColor`, não `fill` por série: o gráfico saía verde. Corrigido (azul-
+  violeta). Na Visão Geral as cores já saíam certas pela ordem do tema.
+- **Larguras das tabelas.** As tabelas encolhiam ao conteúdo; passaram a ter
+  larguras fixas proporcionais, ocupando o cartão.
+- **Efeito colateral durante os testes.** Um comando de UI Automation acionou, no
+  painel Dados, o "ocultar" da tabela `Medidas COI` (só na memória do Desktop).
+  Os arquivos não foram afetados e o projeto foi reaberto a partir deles.
+
+### 81.7. Figma
+
+Página COI, dois frames, mesmos nomes, posições e tamanhos, nada fora dos
+limites:
+
+- **Satisfação** — sem o cartão Pesquisas solicitadas; Pesquisas respondidas na
+  largura toda; cartão da tabela "Avaliações registradas", com o selo "Somente
+  chamados com avaliação registrada". A prévia oculta antiga (com "Situação da
+  pesquisa" e linhas "Sem satisfação") foi apagada.
+- **Por Membro** — cartão só de tabela, com o subtítulo do critério do
+  fornecedor; a prévia oculta passou à variante Tabela.
+
+PNGs 4x (5120 × 2880) reexportados só desses dois frames, no projeto e em
+`Painéis/COI/Assets/Layouts/`. Virtual, Decision e Protect4 não foram abertas.
+
+### 81.8. Validação dos dados (março a setembro de 2026, mesma carga da §80)
+
+Consultas DAX no modelo, depois das mudanças:
+
+| Conferência | Resultado |
+|---|---|
+| Totais | Registrados 25.727; Encerrados 4.036; pesquisas solicitadas 2.550 (medida mantida no modelo); respondidas 2 — iguais à §80 |
+| Por hora | 168 linhas; set/2026 com as 24 horas iguais ao SQL |
+| Por membro no mês | jun/2026: 3.483 registrados e 612 encerrados (`EncerradosComoResponsavel`); a coluna do executor difere por conta (ex.: 53 × 1 para o mesmo membro) e não entra |
+| Por tipo e mês | as 14 células iguais ao SQL; com jun/2026, só junho no eixo (604 / 2.879; 92 / 520) |
+| Satisfação no mês | respondidas por mês: 0, 0, 0, 0, 0, 2 (ago), 0; ago/2026 = SDMs 1719286 (Bom) e 1725655 (Ótimo), ambos `Com satisfação` |
+| Sem seleção (mês único) | set/2026 — nunca a soma dos meses |
+| Relacionamentos e integridade | os 9 da §80, sem alteração; nenhuma linha fora do calendário |
+
+### 81.9. `.pbip` e `.pbix`
+
+- **`.pbip`** (`powerbi/painel/painel-coi.pbip`): atualizado e versionado. Passam
+  a ser versionados também os arquivos que o Desktop cria (`.platform` dos dois
+  itens e `.pbi/editorSettings.json`); `cache.abf` e `localSettings.json` seguem
+  ignorados.
+- **`.pbix`: não gerado.** A gravação pela caixa "Salvar como" do Windows foi
+  tentada por mensagens de janela, sem usar mouse e teclado: o nome foi aceito,
+  mas o tipo continuou "projeto" e o Desktop gravou uma **cópia do projeto**
+  (`painel-coi-2026-10-29.pbix.pbip`) em `Painéis/COI`. A cópia foi apagada logo
+  em seguida; `Painéis/COI/painel-coi.pbix` (14:44) não foi tocado. Gerar o
+  `.pbix` é passo manual (81.10).
+
+### 81.10. Pendências e passos manuais
+
+1. **Salvar o `.pbix`**: abrir `powerbi/painel/painel-coi.pbip` › Arquivo › Salvar
+   como › Procurar este dispositivo › pasta `Painéis/COI` › Tipo **Arquivo do
+   Power BI (*.pbix)** › nome `painel-coi-2026-10-29.pbix` › Salvar. Não usar
+   `painel-coi.pbix`, que é a versão antiga.
+2. **Conferir os cliques** (Ctrl+clique no Desktop, ou clique simples no
+   Serviço): os 7 botões de navegação de cada página e os cartões da Início;
+   Gráfico | Tabela (Visão Geral, Por Hora, Por Tipo); Registrados | Encerrados
+   (Visão Geral, Por Hora); Limpar filtro nas cinco páginas analíticas; e, no
+   gráfico da Visão Geral, os botões de drill (subir nível, ativar drill-down,
+   próximo nível, expandir).
+3. **Segmentação sem seleção**: a seleção única do Power BI tende a manter um
+   item escolhido; se, ainda assim, a seleção for removida, os números das três
+   páginas de mês único continuam no último mês carregado (salvaguarda das
+   medidas, 81.4) até nova escolha ou Limpar filtro. Esse caso foi conferido nas
+   medidas, não por clique na segmentação.

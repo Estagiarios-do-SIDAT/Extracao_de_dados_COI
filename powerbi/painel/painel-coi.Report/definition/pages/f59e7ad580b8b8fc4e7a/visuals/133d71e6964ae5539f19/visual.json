@@ -83,21 +83,6 @@
                       "Entity": "Pesquisas de Satisfação"
                     }
                   },
-                  "Property": "StatusSatisfacao"
-                }
-              },
-              "queryRef": "Pesquisas de Satisfação.StatusSatisfacao",
-              "nativeQueryRef": "StatusSatisfacao",
-              "displayName": "Situação da pesquisa"
-            },
-            {
-              "field": {
-                "Column": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "Pesquisas de Satisfação"
-                    }
-                  },
                   "Property": "RespostaSatisfacao"
                 }
               },
@@ -237,17 +222,17 @@
                 }
               }
             },
-            "outline": {
-              "expr": {
-                "Literal": {
-                  "Value": "'None'"
-                }
-              }
-            },
             "wordWrap": {
               "expr": {
                 "Literal": {
                   "Value": "true"
+                }
+              }
+            },
+            "autoSizeColumnWidth": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
                 }
               }
             }
@@ -345,7 +330,92 @@
           }
         }
       ],
-      "columnWidth": []
+      "columnWidth": [
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "147.9D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.SDM"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "221.9D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.DataEncerramento"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "162.7D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.TipoChamado"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "192.3D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.PesquisaSolicitada"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "207.1D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.RespostaSatisfacao"
+          }
+        },
+        {
+          "properties": {
+            "value": {
+              "expr": {
+                "Literal": {
+                  "Value": "221.9D"
+                }
+              }
+            }
+          },
+          "selector": {
+            "metadata": "Pesquisas de Satisfação.DataPesquisa"
+          }
+        }
+      ]
     },
     "visualContainerObjects": {
       "background": [
@@ -519,5 +589,110 @@
       ]
     },
     "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "e0c7066a953300cde5af",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Pesquisas de Satisfação"
+              }
+            },
+            "Property": "StatusSatisfacao"
+          }
+        },
+        "type": "Categorical",
+        "filter": {
+          "Version": 2,
+          "From": [
+            {
+              "Name": "p",
+              "Entity": "Pesquisas de Satisfação",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "In": {
+                  "Expressions": [
+                    {
+                      "Column": {
+                        "Expression": {
+                          "SourceRef": {
+                            "Source": "p"
+                          }
+                        },
+                        "Property": "StatusSatisfacao"
+                      }
+                    }
+                  ],
+                  "Values": [
+                    [
+                      {
+                        "Literal": {
+                          "Value": "'Com satisfação'"
+                        }
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "6bdec2985c37c507b65b",
+        "field": {
+          "Measure": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Medidas COI"
+              }
+            },
+            "Property": "Avaliação no mês exibido"
+          }
+        },
+        "type": "Advanced",
+        "filter": {
+          "Version": 2,
+          "From": [
+            {
+              "Name": "m",
+              "Entity": "Medidas COI",
+              "Type": 0
+            }
+          ],
+          "Where": [
+            {
+              "Condition": {
+                "Comparison": {
+                  "ComparisonKind": 0,
+                  "Left": {
+                    "Measure": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Source": "m"
+                        }
+                      },
+                      "Property": "Avaliação no mês exibido"
+                    }
+                  },
+                  "Right": {
+                    "Literal": {
+                      "Value": "1L"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
   }
 }

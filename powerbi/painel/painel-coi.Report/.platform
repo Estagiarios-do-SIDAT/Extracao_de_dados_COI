@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "painel-coi"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "cec4d611-d422-43d5-a24d-bae1d7b67399"
+  }
+}

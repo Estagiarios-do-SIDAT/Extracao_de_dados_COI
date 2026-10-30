@@ -42,11 +42,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Registrados por hora"
+                  "Property": "Registrados por hora no mês"
                 }
               },
-              "queryRef": "Medidas COI.Registrados por hora",
-              "nativeQueryRef": "Registrados por hora",
+              "queryRef": "Medidas COI.Registrados por hora no mês",
+              "nativeQueryRef": "Registrados por hora no mês",
               "displayName": "Registrados"
             }
           ]
@@ -282,7 +282,22 @@
             }
           },
           "selector": {
-            "metadata": "Medidas COI.Registrados por hora"
+            "metadata": "Medidas COI.Registrados por hora no mês"
+          }
+        },
+        {
+          "properties": {
+            "defaultColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#008C44'"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       ]

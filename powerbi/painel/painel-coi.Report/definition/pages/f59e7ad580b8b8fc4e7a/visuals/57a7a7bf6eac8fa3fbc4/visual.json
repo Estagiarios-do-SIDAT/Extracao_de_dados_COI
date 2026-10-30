@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "57a7a7bf6eac8fa3fbc4",
   "position": {
-    "x": 743,
+    "x": 122,
     "y": 171,
     "z": 4001,
     "width": 320,
@@ -23,11 +23,11 @@
                       "Entity": "Medidas COI"
                     }
                   },
-                  "Property": "Pesquisas respondidas"
+                  "Property": "Pesquisas respondidas no mês"
                 }
               },
-              "queryRef": "Medidas COI.Pesquisas respondidas",
-              "nativeQueryRef": "Pesquisas respondidas"
+              "queryRef": "Medidas COI.Pesquisas respondidas no mês",
+              "nativeQueryRef": "Pesquisas respondidas no mês"
             }
           ]
         }
@@ -110,19 +110,6 @@
                       "Value": "'#FFFFFF'"
                     }
                   }
-                }
-              }
-            }
-          }
-        }
-      ],
-      "cardTitle": [
-        {
-          "properties": {
-            "show": {
-              "expr": {
-                "Literal": {
-                  "Value": "false"
                 }
               }
             }

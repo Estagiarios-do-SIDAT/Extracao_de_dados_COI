@@ -76,18 +76,18 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Início</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Navegação para as demais páginas e a data e hora da <b>Última atualização</b> dos dados</td><td style='border:1px solid #d0d7de;padding:4px 6px'>—</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Visão Geral</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Totais de Registrados e Encerrados; <b>Gráfico</b>: colunas agrupadas com Ano › Mês › Dia e drill; <b>Tabela</b>: a lista dos chamados, Registrados ou Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Todos os meses</b> ou um mês</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Hora</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráfico</b> das 24 horas, Registrados ou Encerrados; <b>Tabela</b> Hora × Registrados × Encerrados, inclusive horas sem movimento</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráfico</b> de barras e <b>Tabela</b> Membro × Registrados × Encerrados (Encerrados pelo critério do fornecedor)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Membro</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Tabela</b> Membro × Registrados × Encerrados, com total, de todas as contas com movimento no mês (Encerrados pelo critério do fornecedor)</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Por Tipo</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Gráficos</b>: Registrados e Encerrados por tipo e por mês, empilhados, com Incidentes e Solicitações em cada mês; <b>Tabela</b> Tipo × Registrados × Encerrados</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Todos os meses</b> ou um mês</td></tr>
-<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Pesquisas solicitadas, pesquisas respondidas e o detalhe por chamado encerrado</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
+<tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Satisfação</td><td style='border:1px solid #d0d7de;padding:4px 6px'><b>Pesquisas respondidas</b> e a tabela das <b>avaliações registradas</b>: só chamados com satisfação registrada (Com satisfação), com encerramento, tipo, pesquisa solicitada, avaliação e data da resposta</td><td style='border:1px solid #d0d7de;padding:4px 6px'>um mês por vez</td></tr>
 <tr><td style='border:1px solid #d0d7de;padding:4px 6px'>Documentação</td><td style='border:1px solid #d0d7de;padding:4px 6px'>Este conteúdo</td><td style='border:1px solid #d0d7de;padding:4px 6px'>—</td></tr>
 </table>
 <p style='margin-bottom:2px'><b>Filtros e interações</b></p>
 <ul style='margin-top:2px'>
 <li>O filtro Mês/Ano de cada página é <b>independente</b>: escolher um mês numa página não muda as outras.</li>
 <li><b>Visão Geral e Por Tipo</b>: o filtro oferece <b>Todos os meses</b> (padrão) ou um mês; não há seleção de vários meses. <b>Limpar filtro</b> volta a Todos os meses.</li>
-<li><b>Por Hora, Por Membro e Satisfação</b>: seleção única, sempre um mês. A página abre no <b>Último mês completo</b>, nome dado ao mês mais recente carregado, que acompanha cada atualização; <b>Limpar filtro</b> volta a ele. Os demais meses aparecem como mês/ano.</li>
+<li><b>Por Hora, Por Membro e Satisfação</b>: seleção única, sempre um mês. A página abre no <b>Último mês completo</b>, nome dado ao mês mais recente carregado, que acompanha cada atualização; <b>Limpar filtro</b> volta a ele. Os demais meses aparecem como mês/ano. Mesmo sem seleção, os números dessas páginas são os do último mês carregado, nunca a soma de todos os meses.</li>
 <li><b>Por Tipo</b>: em todos os meses, os dois gráficos mostram a evolução mensal; com um mês escolhido, mostram só esse mês, ainda separado em Incidentes e Solicitações. A tabela segue o mesmo filtro.</li>
-<li><b>Gráfico | Tabela</b> (e Registrados | Encerrados) trocam o que a página mostra, sem mudar o filtro.</li>
+<li><b>Gráfico | Tabela</b> (Visão Geral, Por Hora e Por Tipo) e <b>Registrados | Encerrados</b> trocam o que a página mostra, sem mudar o filtro. Por Membro tem só a tabela.</li>
 <li>No gráfico da Visão Geral, os botões do canto do visual sobem ou descem o nível: Ano, Mês, Dia. Os gráficos de Por Tipo estão no nível Mês e podem subir para Ano.</li>
 <li>O título de cada visual informa o período exibido: o mês escolhido ou o intervalo de meses.</li>
 </ul>
@@ -106,7 +106,7 @@ Sem aspas duplas neste arquivo: pode ser colado dentro de uma medida DAX. -->
 <li><b>Responsável</b>, na lista de Encerrados, é o mesmo critério da página Por Membro: o responsável pelo chamado, que nem sempre é quem executou o fechamento.</li>
 <li><b>Por Membro</b>: Registrados e Encerrados de uma conta não precisam ser parecidos. Registros de automação e de chamados transferidos aparecem nas contas técnicas e em Fora do grupo COI. A consulta guarda também quem executou cada encerramento, só para auditoria: não é somado ao indicador.</li>
 <li><b>Membro do grupo COI</b> é a composição de hoje: quem saiu da equipe aparece como Fora do grupo COI, inclusive nos meses em que era membro.</li>
-<li><b>Satisfação</b> quase nunca tem resposta nas filas do COI: o pedido de pesquisa é registrado, mas quase nenhum é respondido. Isso é esperado.</li>
+<li><b>Satisfação</b> quase nunca tem resposta nas filas do COI: o pedido de pesquisa é registrado, mas quase nenhum é respondido. Por isso a página mostra só as avaliações registradas, e muitos meses aparecem sem nenhuma. Os pedidos de pesquisa continuam na base, sem cartão próprio.</li>
 <li>As consultas leem o estado atual da base: uma correção posterior num chamado pode mudar um mês já fechado na próxima atualização.</li>
 </ul>
 
