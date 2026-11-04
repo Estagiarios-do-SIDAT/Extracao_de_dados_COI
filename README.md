@@ -32,7 +32,8 @@ Este repositório atende **somente o COI**. Decision e A2B/Protect4 têm reposit
 │   ├── powerbi-query.md                   documentação das consultas do Power BI
 │   └── documentacao-powerbi-coi.html      conteúdo da página Documentação do painel
 ├── docs/
-│   └── coi-calculation.md                 regras de cálculo, a partir de queries/
+│   ├── coi-calculation.md                 regras de cálculo, a partir de queries/
+│   └── coi-registrados-colunas.md         guia de leitura das colunas de Registrados
 ├── project-context/
 │   └── COI-HISTORICO-CONTEXTO-MESTRE.md   Histórico Mestre do COI
 ├── support/
@@ -72,7 +73,7 @@ Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo,
 
 | Arquivo | Para que serve |
 |---|---|
-| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: categoria, resumo, item de configuração, data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
+| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: categoria, resumo, item de configuração, data/hora do registro, tipo, quem abriu, grupos, evidência, automação e data da primeira transferência para o COI. O que cada coluna significa está em [`docs/coi-registrados-colunas.md`](docs/coi-registrados-colunas.md) |
 | [`queries/consulta_coi_registrados_por_registrador.sql`](queries/consulta_coi_registrados_por_registrador.sql) | A mesma população agrupada por quem registrou (`log_agent`) |
 | [`queries/consulta_coi_registrados_por_evidencia.sql`](queries/consulta_coi_registrados_por_evidencia.sql) | Composição do total por classe de evidência |
 | [`queries/consulta_coi_registrados_validacao.sql`](queries/consulta_coi_registrados_validacao.sql) | Uma linha de sanidade com validações automáticas |
@@ -116,6 +117,8 @@ A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o n
 Cada uma aplica a mesma regra da sua referência, com período automático (os últimos meses completos, quantos o parâmetro `QtdMesesCompletosCOI` do Power Query indicar — 12 por padrão —, nunca antes de março de 2026) e um único resultado. As demais consultas de `queries/` — mensal, por evidência, por registrador, validação, membros, contas técnicas, universo bruto, o resumo da satisfação e as duas por hora separadas — servem à referência, à validação e à conciliação com o fornecedor, e não alimentam o painel.
 
 A documentação das consultas do Power BI está em [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md). O conteúdo da página Documentação, para o visual HTML Content, está em [`powerbi/documentacao-powerbi-coi.html`](powerbi/documentacao-powerbi-coi.html).
+
+As tabelas de chamados da Visão Geral exibem nomes de leitura (por exemplo, `DataRegistroCOI` aparece como **Data de Registro no COI**), trocados só no visual: no SQL e no modelo as colunas mantêm o nome técnico. A correspondência entre os nomes e a explicação de cada coluna de Registrados — as três datas, evidência, automação, os quatro grupos e quem abriu — estão em [`docs/coi-registrados-colunas.md`](docs/coi-registrados-colunas.md).
 
 ## Consultas de apoio
 

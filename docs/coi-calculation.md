@@ -8,6 +8,10 @@ números**.
 As regras aqui descritas são as das consultas de `queries/`, que são a
 referência funcional do COI.
 
+Para **ler** a tabela de Registrados do painel — o que cada coluna mostra, os
+nomes exibidos no Power BI e as diferenças entre datas, evidências e grupos —,
+veja [`coi-registrados-colunas.md`](coi-registrados-colunas.md).
+
 ---
 
 ## Índice
@@ -515,6 +519,14 @@ população de Registrados. É a prova nominal do total.
 | Registro de criação | `GrupoInit`, `InitConsistenteComReconstrucao` |
 | Estado atual | `UUIDGrupoAtual`, `GrupoAtual` |
 | Conferência | `AbertoAntesDoPeriodo`, `Anomalia` |
+
+`DataPrimeiraEntradaNoCOI` é a data da **primeira transferência de grupo com
+destino COI** (`COI` ou `10-COI`) em toda a vida do chamado, e fica vazia quando
+ele nunca foi transferido para o COI. Não é a data do indicador: a primeira
+entrada no COI é a `DataRegistroCOI` (seção [4](#4-dataregistrocoi)), que só
+coincide com ela quando a entrada foi uma transferência. Os nomes exibidos no
+painel e a leitura de cada coluna estão em
+[`coi-registrados-colunas.md`](coi-registrados-colunas.md).
 
 `Item de Configuração` segue a regra da listagem de Encerrados: o nome do IC
 que o SDM exibe no chamado (`ca_owned_resource.resource_name`), ligado por

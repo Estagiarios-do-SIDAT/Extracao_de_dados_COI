@@ -248,7 +248,9 @@ Exemplo: no SDM 1658863, `GrupoInit` é `VIRTUAL TI.ELABORAR/MANTER DOCUMENTAÇ�
 e `PrimeiroDestinoGrupo` é `FORNECEDORES - VIRTUAL`. O chamado nasceu no COI e
 entra no indicador como `ABERTO_NO_COI_CADEIA`, datado na abertura.
 
-A descrição completa dessas colunas está na documentação de cálculo.
+A descrição completa dessas colunas está na documentação de cálculo. O guia de
+leitura das colunas exibidas na tabela de Registrados — com os nomes do painel —
+está em [`docs/coi-registrados-colunas.md`](../docs/coi-registrados-colunas.md).
 
 ---
 
@@ -330,12 +332,31 @@ botões transparentes por cima, com a ação correspondente.
 | Página | Visuais | Filtro Mês/Ano |
 |---|---|---|
 | Início | 6 áreas clicáveis (navegação) e o cartão **Última atualização** | — |
-| Visão Geral | cartões Registrados e Encerrados; **Gráfico**: colunas agrupadas `Registrados no dia` × `Encerrados no dia` com eixo Ano › Mês/Ano › Data (drill nativo); **Tabela**: Registrados (`SDM`, `DataRegistroCOI`, `Tipo`, `Categoria`, `RegistradorNome`, `Resumo`) ou Encerrados (`SDM`, `Data de Encerramento`, `Tipo Chamado`, `Símbolo`, `Responsável`, `Resumo`) | todos os meses ou um mês |
+| Visão Geral | cartões Registrados e Encerrados; **Gráfico**: colunas agrupadas `Registrados no dia` × `Encerrados no dia` com eixo Ano › Mês/Ano › Data (drill nativo); **Tabela**: Registrados (16 colunas, ordenada por `DataRegistroCOI`) ou Encerrados (11 colunas, ordenada por `Data de Encerramento`) — colunas abaixo | todos os meses ou um mês |
 | Por Hora | **Gráfico**: colunas `HoraLabel` (00h–23h) × `Registrados por hora no mês` **ou** × `Encerrados por hora no mês`; **Tabela**: Hora × Registrados × Encerrados, com total | um mês |
 | Por Membro | **Tabela** única: `Membro` × `Registrados por membro no mês` × `Encerrados por membro no mês` (rótulo **Encerrados**), com total, ordenada por Registrados; todas as contas com movimento no mês, inclusive Fora do grupo COI | um mês |
 | Por Tipo | **Gráficos**, empilhados e na largura toda: colunas agrupadas Ano › Mês/Ano × `Registrados por tipo` (em cima) e × `Encerrados por tipo` (embaixo), com legenda `Tipo de Chamado[Tipo]`; **Tabela**: Tipo × Registrados × Encerrados | todos os meses ou um mês |
 | Satisfação | cartão **Pesquisas respondidas** (`Pesquisas respondidas no mês`); tabela das **avaliações registradas**: `SDM`, `DataEncerramento`, `TipoChamado`, `PesquisaSolicitada`, `RespostaSatisfacao`, `DataPesquisa`, com filtros do visual `StatusSatisfacao = Com satisfação` e `Avaliação no mês exibido = 1`; mensagem quando o mês não tem avaliação | um mês |
 | Documentação | visual **HTML Content (lite)** com `Documentação COI[HTML]` | — |
+
+### Tabelas de chamados da Visão Geral
+
+Os nomes exibidos são trocados **só no visual** (renomear para este visual); no
+SQL, no Power Query e no modelo as colunas mantêm o nome técnico.
+
+| Tabela | Colunas, na ordem — nome exibido (coluna técnica, quando difere) |
+|---|---|
+| Registrados | SDM · Tipo · Categoria · Resumo · Item de Configuração · Data de Abertura (`DataAbertura`) · Data de Registro no COI (`DataRegistroCOI`) · Data da 1ª Transferência para o COI (`DataPrimeiraEntradaNoCOI`) · Aberto por (`RegistradorNome`) · Origem da 1ª Transferência (`PrimeiraOrigemGrupo`) · Destino da 1ª Transferência (`PrimeiroDestinoGrupo`) · Grupo Atual (`GrupoAtual`) · Forma de Registro no COI (`FormaRegistroCOI`) · Tipo de Automação (`TipoAutomacaoCOI`) · Código da Evidência (`EvidenciaRegistroCOI`) · Grupo Informado na Criação (`GrupoInit`) |
+| Encerrados | SDM · Tipo (`Tipo Chamado`) · Categoria (`Símbolo`) · Resumo · Item de Configuração · Prioridade · Status · Data de Abertura · Data de Encerramento · Data de Resolução · Responsável |
+
+- Registrados vai da identificação às datas, depois quem abriu e os grupos, e por
+  último a classificação e a auditoria. As cinco primeiras colunas são as mesmas
+  nas duas tabelas.
+- **Cabeçalhos em uma linha**: quebra de texto do cabeçalho desativada
+  (`columnHeaders.wordWrap = false`) e largura fixa por coluna, medida para
+  comportar o título; quando as colunas não cabem, a tabela rola na horizontal.
+- O que cada coluna de Registrados significa está em
+  [`docs/coi-registrados-colunas.md`](../docs/coi-registrados-colunas.md).
 
 ### Filtros e alternâncias
 

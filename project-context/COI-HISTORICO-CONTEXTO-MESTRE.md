@@ -25973,3 +25973,160 @@ e tabelas usadas), `powerbi/powerbi-query.md` (30 colunas no detalhe; seção 6 
 o caminho `powerbi/painel/`). `powerbi/documentacao-powerbi-coi.html` foi revisada
 e não precisou de mudança: não descreve as colunas do detalhe nem o local do
 projeto.
+
+## 83. 2026-11-04 — tabelas de chamados da Visão Geral: ordem, nomes, cabeçalhos em uma linha e guia das colunas de Registrados
+
+Intervenção só de apresentação e documentação. SQL, Power Query, modelo
+(colunas, tipos, medidas, relacionamentos), filtros, indicadores, alternância
+Gráfico | Tabela e Registrados | Encerrados e as demais páginas não mudaram.
+
+### 83.1. Ponto de partida
+
+- Consulta `Chamados Registrados` do projeto externo atualizada com o SQL de
+  `0541ab6` (30 colunas, `Item de Configuração` depois de `Resumo`), modelo
+  atualizado em 04/11/2026: 29.545 Registrados e 4.558 Encerrados, março a
+  outubro de 2026, iguais à validação no SQL Server da seção 82.
+- O usuário acrescentou colunas às duas tabelas da Visão Geral no Desktop:
+  Registrados passou a 16 colunas e Encerrados a 11. Esse estado foi salvo e
+  guardado como cópia antes de qualquer mudança.
+
+### 83.2. Ordem e nomes de Registrados
+
+Nomes trocados **só no visual** (renomear para este visual); no SQL, no Power
+Query e no modelo as colunas mantêm o nome técnico.
+
+| # | Antes | Depois: nome exibido (coluna técnica) |
+|---|---|---|
+| 1 | SDM | SDM |
+| 2 | Tipo | Tipo |
+| 3 | Categoria | Categoria |
+| 4 | Resumo | Resumo |
+| 5 | Item de Configuração | Item de Configuração |
+| 6 | DataAbertura | Data de Abertura (`DataAbertura`) |
+| 7 | Registro no COI | Data de Registro no COI (`DataRegistroCOI`) |
+| 8 | FormaRegistroCOI | Data da 1ª Transferência para o COI (`DataPrimeiraEntradaNoCOI`) |
+| 9 | EvidenciaRegistroCOI | Aberto por (`RegistradorNome`) |
+| 10 | TipoAutomacaoCOI | Origem da 1ª Transferência (`PrimeiraOrigemGrupo`) |
+| 11 | GrupoInit | Destino da 1ª Transferência (`PrimeiroDestinoGrupo`) |
+| 12 | PrimeiraOrigemGrupo | Grupo Atual (`GrupoAtual`) |
+| 13 | PrimeiroDestinoGrupo | Forma de Registro no COI (`FormaRegistroCOI`) |
+| 14 | DataPrimeiraEntradaNoCOI | Tipo de Automação (`TipoAutomacaoCOI`) |
+| 15 | RegistradorNome | Código da Evidência (`EvidenciaRegistroCOI`) |
+| 16 | GrupoAtual | Grupo Informado na Criação (`GrupoInit`) |
+
+Blocos: identificação (1–5, as mesmas cinco de Encerrados), datas (6–8), quem
+abriu e grupos em ordem cronológica (9–12), classificação e auditoria (13–16).
+Ordenação do visual inalterada: `DataRegistroCOI`, decrescente.
+
+Decisões de nome, conferidas no SQL e em `docs/coi-calculation.md`:
+
+- `DataPrimeiraEntradaNoCOI` é o **primeiro evento de transferência de grupo com
+  destino COI** (`COI` ou `10-COI`) da vida do chamado, vazio quando ele nunca
+  foi transferido para o COI. O nome técnico sugere a primeira entrada, que é a
+  `DataRegistroCOI`. Exibida como **Data da 1ª Transferência para o COI**.
+- `RegistradorNome` é `call_req.log_agent`: quem **abriu** o chamado, não quem o
+  trouxe para o COI nem o responsável (`call_req.assignee`). Exibida como
+  **Aberto por**.
+- `PrimeiraOrigemGrupo` e `PrimeiroDestinoGrupo` descrevem a primeira
+  transferência de grupo **de qualquer destino**; `GrupoInit` é a fila
+  **declarada** no `%GROUP=` da criação; `GrupoAtual` é a fila de hoje. Os
+  quatro nomes exibidos marcam essas diferenças.
+- `FormaRegistroCOI` (texto) e `EvidenciaRegistroCOI` (código) são a mesma
+  informação em duas linguagens; `TipoAutomacaoCOI` é independente delas.
+
+### 83.3. Encerrados
+
+Mantida: as 11 colunas, na mesma ordem e com os mesmos nomes (SDM, Tipo,
+Categoria, Resumo, Item de Configuração, Prioridade, Status, Data de Abertura,
+Data de Encerramento, Data de Resolução, Responsável). A ordem segue a saída
+documentada da consulta de Encerrados, e a data do indicador vem logo depois da
+abertura; não havia inconsistência que justificasse mudança. Mudaram só a
+largura das colunas e a quebra do cabeçalho (83.4).
+
+### 83.4. Cabeçalhos em uma linha
+
+- `columnHeaders.wordWrap = false` nas duas tabelas.
+- Largura fixa por coluna, medida com a fonte do visual (Segoe UI Semibold 10 pt
+  no cabeçalho, Segoe UI 10 pt nos valores): o maior entre o título com margem
+  — e a seta de ordenação, na coluna ordenada — e o percentil 95 dos valores
+  com margem. Texto longo (Resumo, Categoria) mantém a largura anterior; a tabela
+  rola na horizontal.
+- Larguras (px) — Registrados: SDM 94,6 · Tipo 104 · Categoria 227 · Resumo
+  378,4 · Item de Configuração automática · Data de Abertura 141,9 · Data de
+  Registro no COI 180 · Data da 1ª Transferência para o COI 245 · Aberto por 330
+  · Origem e Destino da 1ª Transferência 380 · Grupo Atual 380 · Forma de
+  Registro no COI 215 · Tipo de Automação 160 · Código da Evidência 350 · Grupo
+  Informado na Criação 345. Encerrados: SDM 94,6 · Tipo 104 · Categoria 227 ·
+  Resumo 378,4 · Item de Configuração automática · Prioridade 90 · Status 145 ·
+  Data de Abertura 141,9 · Data de Encerramento 165 · Data de Resolução 141,9 ·
+  Responsável 290.
+
+### 83.5. Documentação
+
+- **Novo:** `docs/coi-registrados-colunas.md` — guia de leitura das colunas de
+  Registrados para quem não conhece o SQL: correspondência entre nome técnico e
+  nome exibido (Registrados e Encerrados), as três datas, Forma × Código da
+  Evidência × Tipo de Automação, os quatro grupos, Aberto por × responsável, por
+  que aparecem filas de fornecedor ou do NSTI (automação Task Scheduler / SESUC
+  registra direto na fila de destino; o COI registra e encaminha) e valores
+  especiais. Exemplos com SDMs reais e totais do painel de 04/11/2026.
+- `docs/coi-calculation.md`: ponteiro para o guia no início e, na seção 10, o
+  significado exato de `DataPrimeiraEntradaNoCOI`.
+- `powerbi/powerbi-query.md`: tabelas da Visão Geral (ordem, nomes, colunas
+  técnicas, cabeçalhos em uma linha) e ponteiro para o guia.
+- `README.md`: guia na estrutura e no painel; o detalhe descreve "quem abriu", e
+  não mais "quem registrou".
+- `powerbi/documentacao-powerbi-coi.html`: a seção 8 deixou de ser só as três
+  colunas de diagnóstico e passou a "Tabelas de chamados da Visão Geral", em
+  linguagem de usuário; as seções 1 e 5 usam os nomes exibidos.
+
+### 83.6. Página Documentação do painel
+
+A página mostra `Documentação COI[HTML]` no visual HTML Content (lite). A
+coluna vem de um literal M na partição da tabela, igual ao HTML do repositório
+com as quebras de linha como `#(lf)`. O literal foi regerado a partir do novo
+HTML — conferido antes que a regra de geração reproduzia o literal anterior byte
+a byte — e só a tabela `Documentação COI` foi atualizada (sem fonte externa,
+sem consulta nativa). As demais tabelas mantiveram os dados de 04/11/2026.
+
+### 83.7. Testes
+
+- Registrados: 16 colunas na ordem e com os nomes acima; Encerrados: 11
+  colunas, inalteradas. Conferido no painel de campos do visual e nos
+  cabeçalhos renderizados.
+- Cabeçalhos: linha de cabeçalho com uma linha de texto nas duas tabelas,
+  títulos inteiros, inclusive depois de rolar a tabela até a última coluna.
+- Mesmas linhas e valores: 29.545 / 4.558; por mês, Registrados 4.342, 3.680,
+  3.422, 3.483, 3.398, 3.679, 3.723, 3.818 e Encerrados 478, 728, 593, 612,
+  583, 589, 453, 522.
+- Filtro set/2026: 3.723 / 453, as duas tabelas seguem o mês; Limpar filtro
+  volta a Todos os meses.
+- Indicadores Tabela – Registrados, Tabela – Encerrados e Limpar filtro
+  funcionando; os indicadores guardam só a exibição dos visuais, não as colunas.
+- As sete páginas abrem sem erro; a página Documentação mostra a nova seção 8.
+- Modelo do `.pbix` final: 32 medidas, 9 relacionamentos, 110 colunas, o mesmo
+  de antes.
+
+### 83.8. Arquivos do Power BI (fora do repositório)
+
+- Salvo: `Painéis\COI\painel-coi-atualizado-2026-11-04.pbix`, gerado pelo
+  Desktop a partir de um projeto de trabalho e conferido como `.pbix` válido;
+  diferenças em relação à cópia anterior: as duas tabelas da Visão Geral e o
+  conteúdo da tabela `Documentação COI`.
+- Cópias anteriores, na mesma pasta: `..._antes-documentacao-cabecalhos.pbix`
+  (estado do usuário antes desta etapa), `..._antes-reorganizacao-colunas.pbix`
+  e `..._backup-1014.pbix`.
+- O projeto `.pbip` externo (`FAIA FARC/painel`) não foi alterado nesta etapa
+  e ficou atrás do `.pbix`: não tem as colunas acrescentadas às tabelas, a nova
+  ordem, os nomes nem a nova página Documentação. O `.pbix` é a versão vigente.
+
+### 83.9. Limitações e pendências
+
+- Os números e SDMs de exemplo do guia são do carregamento de 04/11/2026 e
+  mudam a cada atualização; as regras não.
+- `DataPrimeiraEntradaNoCOI` mantém o nome técnico, que sugere "primeira
+  entrada"; trocá-lo exigiria mudar SQL e modelo. O nome exibido e o guia
+  esclarecem o significado.
+- Item de Configuração ficou com largura automática nas duas tabelas, como
+  antes; valores muito longos de Resumo, Categoria e Item de Configuração
+  continuam truncados com reticências na célula, e a tabela rola na horizontal.
