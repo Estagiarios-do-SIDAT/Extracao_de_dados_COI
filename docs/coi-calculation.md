@@ -69,7 +69,7 @@ Base `mdb` do CA Service Desk Manager, lida somente para leitura.
 | `act_log` | Histórico de eventos. As transferências de grupo (eventos `TR`), o registro de criação (evento `INIT`), os eventos de fechamento e de solução (quem encerrou, seção [11](#11-por-registrador-e-por-membro)) e o pedido de pesquisa (`SRVY_SENT`, seção [14](#14-pesquisa-de-satisfação-dos-encerrados)) |
 | `ca_contact` | Cadastro de grupos e pessoas: identifica a fila do COI, as contas técnicas e os nomes |
 | `grpmem` | Composição dos grupos: confere se o grupo auditado em Encerrados tem membros e classifica as contas como membro do COI |
-| `cr_stat`, `prob_ctg`, `ca_owned_resource` | Nome do status, categoria e item de configuração, na listagem de Encerrados |
+| `cr_stat`, `prob_ctg`, `ca_owned_resource` | Nome do status, categoria e item de configuração, na listagem de Encerrados; categoria e item de configuração também no detalhe de Registrados |
 | `survey`, `survey_question`, `survey_answer` | Pesquisa de satisfação: a pesquisa, as perguntas e a opção escolhida |
 | `sys.all_objects` | Catálogo do SQL Server, usado só para gerar a sequência de dias e horas dos calendários |
 
@@ -507,7 +507,7 @@ população de Registrados. É a prova nominal do total.
 | Grupo de colunas | Colunas |
 |---|---|
 | Identificação e data | `SDM`, `DataAbertura`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro` |
-| Descrição | `Categoria` (`prob_ctg.sym`, `N/A` sem categoria) e `Resumo` (`call_req.summary`), logo depois de `SDM` |
+| Descrição | `Categoria` (`prob_ctg.sym`, `N/A` sem categoria), `Resumo` (`call_req.summary`) e `Item de Configuração` (`ca_owned_resource.resource_name` por `call_req.affected_rc`, `N/A` sem IC), logo depois de `SDM` |
 | Como entrou | `FormaRegistroCOI`, `EvidenciaRegistroCOI`, `TipoAutomacaoCOI`, `AliasEvidencia` |
 | Tipo | `TipoCodigo`, `Tipo` |
 | Quem abriu | `RegistradorUUID`, `RegistradorUserID`, `RegistradorNome` |
@@ -515,6 +515,15 @@ população de Registrados. É a prova nominal do total.
 | Registro de criação | `GrupoInit`, `InitConsistenteComReconstrucao` |
 | Estado atual | `UUIDGrupoAtual`, `GrupoAtual` |
 | Conferência | `AbertoAntesDoPeriodo`, `Anomalia` |
+
+`Item de Configuração` segue a regra da listagem de Encerrados: o nome do IC
+que o SDM exibe no chamado (`ca_owned_resource.resource_name`), ligado por
+`call_req.affected_rc = ca_owned_resource.own_resource_uuid`. O chamado tem no
+máximo **um** IC — `affected_rc` é uma coluna de `call_req`, e a base não tem
+tabela de vários ICs por chamado (as relações de vários ICs existem só para
+mudanças e *issues*). `own_resource_uuid` é a chave primária do cadastro, então
+a ligação não multiplica nem remove linha; sem IC, a coluna mostra `N/A`. Como
+Categoria e Resumo, é informativa: não entra em nenhuma regra.
 
 `FormaRegistroCOI` traduz a evidência técnica para leitura:
 

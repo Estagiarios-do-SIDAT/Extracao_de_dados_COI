@@ -75,7 +75,8 @@ Prova de auditoria da base de Registrados: lista NOMINALMENTE os chamados que
 compoem o total do indicador, com quem registrou e POR QUE cada um entrou.
 
 Saida: UM unico result set, UMA linha por SDM.
-    SDM, Categoria, Resumo, DataAbertura, DataRegistroCOI, FormaRegistroCOI,
+    SDM, Categoria, Resumo, [Item de Configuração], DataAbertura,
+    DataRegistroCOI, FormaRegistroCOI,
     EvidenciaRegistroCOI, TipoAutomacaoCOI, GrupoInit, PrimeiraOrigemGrupo,
     PrimeiroDestinoGrupo, DataRegistro, HoraRegistro, TipoCodigo, Tipo,
     RegistradorUUID, RegistradorUserID, RegistradorNome, AliasEvidencia,
@@ -1290,6 +1291,20 @@ CREATE CLUSTERED INDEX IX_RegRessalvas ON #RegRessalvas(id);
 --   multiplicam nem removem linha: a populacao e a do bloco canonico, intacta.
 --   O bloco canonico de Registrados, acima, NAO foi alterado.
 --
+-- ITEM DE CONFIGURACAO (coluna informativa, logo apos Resumo)
+--
+--   Mesma definicao de [Item de Configuração] em
+--   queries/consulta_coi_encerrados.sql:
+--     Item de Configuração = ca_owned_resource.resource_name, o nome do IC que
+--                            o SDM exibe no chamado, ligado por
+--                            call_req.affected_rc = ca_owned_resource.own_resource_uuid;
+--                            sem IC (affected_rc nulo ou nao resolvido), 'N/A'.
+--   affected_rc e UMA coluna de call_req: o chamado tem no maximo um IC, e nao
+--   ha tabela de varios ICs por chamado (as relacoes usp_lrel_asset_chgnr e
+--   usp_lrel_asset_issnr sao de mudancas e de issues). own_resource_uuid e a
+--   chave primaria de ca_owned_resource. O LEFT JOIN, portanto, nao multiplica
+--   nem remove linha, e nada e escolhido nem agregado.
+--
 -- AS DUAS COLUNAS DE EVIDENCIA, e por que sao duas
 --
 --   FormaRegistroCOI      texto de negocio, para ler e filtrar no Excel/Power BI
@@ -1331,6 +1346,7 @@ SELECT
     r.SDM,
     ISNULL(pc.sym, N'N/A')                          AS [Categoria],
     LTRIM(RTRIM(ISNULL(cr.summary, N'')))           AS [Resumo],
+    ISNULL(ci.resource_name, N'N/A')                AS [Item de Configuração],
     r.abertura_br                                   AS DataAbertura,
     r.registro_br                                   AS DataRegistroCOI,
 
@@ -1406,11 +1422,14 @@ SELECT
 FROM #Registrados AS r
 LEFT JOIN dbo.ca_contact AS reg
     ON reg.contact_uuid = r.log_agent
--- Categoria e Resumo: so leitura, chave unica (id e persid), sem filtro.
+-- Categoria, Resumo e Item de Configuração: so leitura, chave unica (id,
+-- persid e own_resource_uuid), sem filtro.
 LEFT JOIN dbo.call_req AS cr
     ON cr.id = r.id
 LEFT JOIN dbo.prob_ctg AS pc
     ON pc.persid = cr.category
+LEFT JOIN dbo.ca_owned_resource AS ci
+    ON ci.own_resource_uuid = cr.affected_rc
 ORDER BY
     r.registro_br,
     r.SDM;

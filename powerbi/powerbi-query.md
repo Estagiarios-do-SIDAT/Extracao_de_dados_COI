@@ -54,7 +54,7 @@ As cinco páginas analíticas (2 a 6) usam estas consultas:
 
 | Consulta do Power BI | Granularidade | Colunas | Páginas |
 |---|---|---|---|
-| `consulta_coi_registrados_detalhe_power_bi.sql` | 1 linha por SDM **registrado** | 29, entre elas `SDM`, `Categoria`, `Resumo`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro`, `Tipo`, `RegistradorNome`, `FormaRegistroCOI` | Visão Geral (cartão e tabela), Por Tipo |
+| `consulta_coi_registrados_detalhe_power_bi.sql` | 1 linha por SDM **registrado** | 30, entre elas `SDM`, `Categoria`, `Resumo`, `Item de Configuração`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro`, `Tipo`, `RegistradorNome`, `FormaRegistroCOI` | Visão Geral (cartão e tabela), Por Tipo |
 | `consulta_coi_encerrados_power_bi.sql` | 1 linha por SDM **encerrado** | 14: `SDM`, `Tipo Chamado`, `Símbolo` (categoria), `Resumo`, `Item de Configuração`, `Prioridade`, `Status`, `Código Status`, `Data de Abertura`, `Data de Encerramento`, `Data de Resolução`, `Responsável`, `Grupo Atual`, `UUID Grupo Atual` | Visão Geral (cartão e tabela), Por Tipo |
 | `consulta_coi_registrados_encerrados_diario_power_bi.sql` | 1 linha por **dia** do período, inclusive dias sem movimento | `Dia`, `Registrados`, `Encerrados` | Visão Geral (gráfico Ano → Mês → Dia) |
 | `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `Registrados`, `Encerrados` | Por Hora |
@@ -254,10 +254,14 @@ A descrição completa dessas colunas está na documentação de cálculo.
 
 ## 6. Montagem das páginas
 
-O painel está em `powerbi/painel/` como **projeto do Power BI** (`painel-coi.pbip`):
-o modelo em `painel-coi.SemanticModel/model.bim` e o relatório em
-`painel-coi.Report/` (formato PBIR). Abra o `.pbip` no Power BI Desktop; para
-publicar, use **Arquivo › Salvar como** `.pbix` ou publique direto do Desktop.
+O painel é um **projeto do Power BI** (`painel-coi.pbip`) mantido **fora deste
+repositório**: o modelo em `painel-coi.SemanticModel/model.bim` e o relatório em
+`painel-coi.Report/` (formato PBIR). O repositório guarda só as consultas SQL e a
+documentação; projetos do Power BI (`.pbip`, `.pbix`, `.pbit` e as pastas
+`.Report`/`.SemanticModel`) estão no `.gitignore`. Abra o `.pbip` no Power BI
+Desktop; para publicar, use **Arquivo › Salvar como** `.pbix` ou publique direto
+do Desktop. Uma mudança numa consulta de `powerbi/` só chega ao painel quando o
+texto é colado na etapa `Sql` da consulta correspondente (seção 7).
 
 ### Tabelas do modelo
 

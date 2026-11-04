@@ -1,0 +1,10 @@
+# Projetos do Power BI ficam fora deste repositorio, que guarda so as consultas
+# SQL e a documentacao (powerbi/ continua com as consultas e os documentos).
+*.pbix
+*.pbit
+*.pbip
+*.Report/
+*.SemanticModel/
+*.Dataset/
+.pbi/
+powerbi/painel/

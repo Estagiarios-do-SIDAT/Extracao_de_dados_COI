@@ -72,7 +72,7 @@ Um chamado entra por evidência de passagem pela fila COI (cadeia real de grupo,
 
 | Arquivo | Para que serve |
 |---|---|
-| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: categoria, resumo, data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
+| [`queries/consulta_coi_registrados_detalhe.sql`](queries/consulta_coi_registrados_detalhe.sql) | **Uma linha por SDM**: categoria, resumo, item de configuração, data/hora do registro, tipo, quem registrou, grupo atual, evidência e data da primeira entrada na fila |
 | [`queries/consulta_coi_registrados_por_registrador.sql`](queries/consulta_coi_registrados_por_registrador.sql) | A mesma população agrupada por quem registrou (`log_agent`) |
 | [`queries/consulta_coi_registrados_por_evidencia.sql`](queries/consulta_coi_registrados_por_evidencia.sql) | Composição do total por classe de evidência |
 | [`queries/consulta_coi_registrados_validacao.sql`](queries/consulta_coi_registrados_validacao.sql) | Uma linha de sanidade com validações automáticas |
@@ -100,7 +100,7 @@ Com a mesma população e a mesma conferência do grupo alvo:
 
 ### Painel
 
-O painel tem sete páginas: **Início** (navegação e última atualização), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**. O projeto do Power BI está em [`powerbi/painel/`](powerbi/painel/) (`painel-coi.pbip`): modelo, relatório e os fundos das páginas, exportados do Figma; a montagem está na seção 6 de [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md).
+O painel tem sete páginas: **Início** (navegação e última atualização), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**. O projeto do Power BI (`painel-coi.pbip`: modelo, relatório e os fundos das páginas, exportados do Figma) é mantido **fora deste repositório**; aqui ficam as consultas SQL que ele usa e a documentação. A montagem das páginas está na seção 6 de [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md).
 
 A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
 

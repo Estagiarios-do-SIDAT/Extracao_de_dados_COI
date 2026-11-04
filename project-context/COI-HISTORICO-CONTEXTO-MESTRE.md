@@ -25888,3 +25888,88 @@ Consultas DAX no modelo, depois das mudanças:
    páginas de mês único continuam no último mês carregado (salvaguarda das
    medidas, 81.4) até nova escolha ou Limpar filtro. Esse caso foi conferido nas
    medidas, não por clique na segmentação.
+
+## 82. 2026-11-04 — `Item de Configuração` no detalhe de Registrados; projeto do Power BI fora do repositório
+
+### 82.1. A coluna nova
+
+`queries/consulta_coi_registrados_detalhe.sql` e
+`powerbi/consulta_coi_registrados_detalhe_power_bi.sql` ganharam
+**`[Item de Configuração]`**, logo depois de `Resumo` (30 colunas). É a única
+mudança funcional: só projeção, fora do bloco canônico.
+
+| Item | Decisão |
+|---|---|
+| Origem | `ca_owned_resource.resource_name` — o nome do IC que o SDM exibe no chamado |
+| Relacionamento | `LEFT JOIN dbo.ca_owned_resource AS ci ON ci.own_resource_uuid = cr.affected_rc`, sobre o `call_req` que a projeção já lia para Categoria e Resumo |
+| Sem IC | `N/A` (`affected_rc` nulo ou sem cadastro) — o mesmo tratamento de `Categoria` |
+| Regra de referência | a de `[Item de Configuração]` em `consulta_coi_encerrados.sql`, que já existia; as duas listagens dão o mesmo IC para o mesmo chamado |
+
+**Por que não há escolha nem agregação de vários ICs.** Investigado no esquema do
+`mdb` (somente leitura):
+
+- `call_req` tem **uma** coluna de IC, `affected_rc` (binary 16): o chamado tem no
+  máximo um IC;
+- `ca_owned_resource.own_resource_uuid` é a **chave primária** (68.608 linhas, 68.608
+  valores distintos): a ligação não multiplica linha;
+- as tabelas de vários ICs por registro são de **mudanças**
+  (`usp_lrel_asset_chgnr`) e de ***issues*** (`usp_lrel_asset_issnr`), não de
+  chamados; `usm_link_subscription_asset` (catálogo) está vazia e não aponta para
+  `call_req`;
+- nos 49.348 chamados abertos de março a setembro de 2026 (todos, não só COI), 25
+  não têm `affected_rc`; todo `affected_rc` preenchido tem cadastro e nome.
+
+Bloco canônico de Registrados intocado: 13/13 cópias com o SHA256 oficial
+`e9a3f18dc487c2962af5441e464a6595286eab84dc6fcfe20c9a19f6676197cc`.
+
+### 82.2. Validação no SQL Server (04/11/2026)
+
+As duas consultas rodaram **antes** (texto do commit `114f891`) e **depois** da
+mudança. Em 04/11/2026 o último mês completo é outubro, então o período automático
+da versão do Power BI (12 meses, piso 01/03/2026) já vai de março a **outubro**.
+
+| Execução | Linhas | Resultado |
+|---|---|---|
+| Referência, mar–set/2026, antes × depois | 25.727 × 25.727 | mesmos SDMs na mesma ordem; as 29 colunas antigas iguais em todas as linhas; por mês 4.342, 3.680, 3.422, 3.483, 3.398, 3.679, 3.723 — o total histórico |
+| Power BI, 12 meses (mar–out/2026), antes × depois | 29.545 × 29.545 | idem; outubro com 3.818 |
+| Referência mar–out × Power BI 12 meses, depois | 29.545 × 29.545 | **idênticas** linha a linha, inclusive o IC |
+| Recorte mar–set da referência mar–out × referência mar–set | 25.727 | idênticos |
+| Preenchimento do IC | — | 100% preenchido nos Registrados (nenhum `N/A` no período); 1.564 ICs distintos em mar–set e 1.722 em mar–out |
+
+Conferência direta no SDM, por `call_req.ref_num` → `affected_rc` →
+`ca_owned_resource`, sem usar a consulta alterada: 1681026 *Serviço Backup*,
+1691195 *rch-prd-cogn-3a*, 1701566 *Desktop Virtual*, 1712498 *scdefender*,
+1723633 *rancher*, 1733815 *scdefender* — os seis iguais ao resultado da consulta,
+todos ICs ativos. ICs mais frequentes em mar–out: scdefender (1.090), Documento
+(997), Infraestrutura de Datacenter – DF (987), Serviço Backup (830), Serviço
+Storage (631), Serviço COI (564).
+
+Nota de método: na primeira comparação referência × Power BI, as colunas binárias
+(`RegistradorUUID`, `UUIDGrupoAtual`) pareceram diferentes porque os dois
+executores de teste formatam binário de forma distinta (`0xC6BB…` × `198 187 …`);
+normalizado o formato, são iguais.
+
+### 82.3. Projeto do Power BI fora do repositório
+
+O usuário moveu a pasta do projeto do Power BI para fora do repositório
+(`FAIA FARC/painel`), e essa é a organização definitiva:
+
+- `powerbi/painel/` saiu **só do controle de versão** (`git rm --cached`, 136
+  arquivos); a cópia externa não foi aberta, alterada nem restaurada;
+- `.gitignore` na raiz bloqueia `*.pbix`, `*.pbit`, `*.pbip`, `*.Report/`,
+  `*.SemanticModel/`, `*.Dataset/`, `.pbi/` e `powerbi/painel/`;
+- `powerbi/` continua com as seis consultas do painel, `powerbi-query.md` e
+  `documentacao-powerbi-coi.html`;
+- o Power BI **não** foi alterado nesta etapa: a coluna nova chega ao painel
+  quando o texto de `consulta_coi_registrados_detalhe_power_bi.sql` for colado na
+  etapa `Sql` da consulta `Chamados Registrados` e a coluna for acrescentada ao
+  modelo — passo do usuário.
+
+### 82.4. Documentação
+
+`README.md` (detalhe com item de configuração; projeto do Power BI fora do
+repositório), `docs/coi-calculation.md` (tabela de colunas do detalhe, regra do IC
+e tabelas usadas), `powerbi/powerbi-query.md` (30 colunas no detalhe; seção 6 sem
+o caminho `powerbi/painel/`). `powerbi/documentacao-powerbi-coi.html` foi revisada
+e não precisou de mudança: não descreve as colunas do detalhe nem o local do
+projeto.
