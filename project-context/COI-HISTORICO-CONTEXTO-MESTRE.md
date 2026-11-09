@@ -26321,3 +26321,45 @@ HTML.
 - O menu dos fundos mostra "Movimentação", e a aba da página no Desktop mostra
   "Movimentação de Chamados", por decisão de nomenclatura.
 - A cópia do painel na pasta sincronizada com o SharePoint não foi atualizada.
+
+## 85. 2026-11-09 (2ª) — Movimentação de Chamados: Registrados | Encerrados antes de Gráfico | Tabela
+
+Correção pontual de ordem, pedida pelo usuário para seguir o padrão da Visão
+Geral. Só a posição dos botões mudou; os seis estados, os indicadores de
+exibição, as ações dos botões, as medidas e o filtro ficaram como estavam.
+
+| Botão | x | Largura × altura |
+|---|---|---|
+| Registrados | 886 | 102 × 28 |
+| Encerrados | 990 | 100 × 28 |
+| Gráfico | 1094 | 76 × 28 |
+| Tabela | 1172 | 76 × 28 |
+
+- Todos em y 160, as mesmas posições e medidas da Visão Geral: 2 px dentro de cada
+  par e 4 px entre os pares. Os botões ativo e inativo de cada opção (12 no total)
+  têm posição e tamanho idênticos; a conferência nos arquivos mostrou que só
+  `position` mudou em cada um. Com Tabela, Registrados | Encerrados continua
+  oculto.
+- Figma: nas seis prévias (Por hora e Por dia), Registrados | Encerrados à esquerda
+  de Gráfico | Tabela na mesma linha, e a indicação "Ambos os indicadores" das
+  tabelas no lugar de Registrados | Encerrados. O frame da página não desenha os
+  botões (são nativos), e o PNG 4x reexportado saiu idêntico ao fundo em uso, que
+  não foi trocado.
+- Segmentação Mês/Ano: Seleção única (`strictSingleSelect = true`) e padrão
+  Último mês completo, sem mudança.
+- Arquivos: cópia do projeto externo em
+  `FAIA FARC\painel-backup-2026-11-09-antes-ordem-botoes` antes da alteração;
+  projeto salvo; `.pbix` novo `Painéis\COI\painel-coi-movimentacao-2026-11-09-v3.pbix`,
+  sem sobrescrever o `-v2` nem os anteriores.
+- O `-v2` tinha sido gravado de novo às 15:05 por um aviso "Deseja salvar suas
+  alterações?" que ficou aberto depois da validação; o conteúdo do relatório é o
+  mesmo do projeto externo. Esse aviso não aceitava automação, e o processo do
+  Desktop que o mostrava foi encerrado sem salvar; o `-v2` ficou como estava.
+- Testes no Power BI Desktop, pelos indicadores de exibição: nos seis estados os
+  quatro botões aparecem na ordem Registrados | Encerrados, Gráfico | Tabela, com
+  o conteúdo e as opções ativas certos; set/2026 escolhido em Por dia – Gráfico –
+  Registrados continuou em Por hora – Gráfico – Registrados e em Por hora –
+  Tabela; Limpar filtro voltou ao Último mês completo (out/2026: 3.818
+  Registrados e 522 Encerrados). O `-v3` tem ZIP íntegro com `DataModel`,
+  relatório igual ao do projeto externo em 131 arquivos e sete páginas, e abre em
+  Por dia – Gráfico – Registrados.

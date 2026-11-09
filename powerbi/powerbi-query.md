@@ -368,11 +368,13 @@ Chamados**. Os controles têm três níveis, cada um no seu lugar:
 | Nível | Botões | Onde (px, página 1280 × 720) | Efeito |
 |---|---|---|---|
 | 1. Distribuição | **Por dia \| Por hora** | caixa *Distribuição* do cabeçalho, ao lado da caixa *Mês/Ano*: botões em x 649 e 736, y 94, 84 × 27 | troca a distribuição temporal; mantém Gráfico/Tabela e o indicador escolhidos |
-| 2. Apresentação | **Gráfico \| Tabela** | canto superior direito do quadro, na linha y 160: x 878 e 956, 76 × 28 | troca o visual da distribuição ativa |
-| 3. Indicador | **Registrados \| Encerrados** | mesma linha, à direita, 12 px depois de Tabela: x 1044 (102 × 28) e 1148 (100 × 28), terminando em 1248 | só com Gráfico: uma série por vez; com Tabela fica oculto, porque a tabela mostra as duas |
+| 2. Apresentação | **Gráfico \| Tabela** | canto superior direito do quadro, na linha y 160: x 1094 e 1172, 76 × 28 | troca o visual da distribuição ativa |
+| 3. Indicador | **Registrados \| Encerrados** | mesma linha, à esquerda de Gráfico \| Tabela: x 886 (102 × 28) e 990 (100 × 28) | só com Gráfico: uma série por vez; com Tabela fica oculto, porque a tabela mostra as duas |
 
 Os quatro botões de apresentação e indicador seguem a Visão Geral: mesma linha,
-altura 28, larguras 76/76 e 102/100, 2 px dentro de cada par; ativo e inativo de
+mesma ordem (Registrados | Encerrados, depois Gráfico | Tabela) e mesmas
+posições (x 886, 990, 1094 e 1172), altura 28, larguras 102/100 e 76/76, 2 px
+dentro de cada par e 4 px entre os pares; ativo e inativo de
 cada opção têm a mesma posição e o mesmo tamanho. Gráficos e tabelas ocupam x 58,
 y 204, 1194 × 486. A segmentação Mês/Ano da página tem **Seleção única**
 (`strictSingleSelect`), como Por Membro, Por Tipo e Satisfação. Seis estados, um indicador
