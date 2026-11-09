@@ -397,6 +397,11 @@ se encontram no dia:
 Um mesmo chamado pode aparecer em Registrados num dia e em Encerrados em outro,
 só numa das séries, ou em nenhuma. Incidentes e Solicitações vêm juntos.
 
+No painel, esta série alimenta o gráfico da Visão Geral e a modalidade **Por
+dia** da página Movimentação de Chamados. Num mesmo mês, a soma dos dias é igual ao total
+do mês e à soma das 24 horas da consulta por hora (seção [9](#9-por-hora)): as
+duas distribuições repartem os mesmos chamados, uma pelo dia e outra pela hora.
+
 ---
 
 ## 8. Registrados por mês

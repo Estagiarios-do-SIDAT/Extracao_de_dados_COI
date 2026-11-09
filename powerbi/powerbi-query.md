@@ -44,7 +44,7 @@ O painel tem sete páginas:
 |---|---|---|---|
 | 1 | **Início** | navegação para as demais páginas e data e hora da última atualização | nenhuma (`Última Atualização`, do Power Query) |
 | 2 | **Visão Geral** | totais de Registrados e Encerrados, evolução Ano → Mês → Dia e a lista dos chamados | detalhe de registrados, encerrados, diário |
-| 3 | **Por Hora** | distribuição pelas 24 horas do dia, Registrados ou Encerrados | Registrados × Encerrados por hora |
+| 3 | **Movimentação de Chamados** (menu: *Movimentação*) | distribuição pelos dias do mês (**Por dia**) ou pelas 24 horas do dia (**Por hora**), Registrados ou Encerrados, no mês selecionado | Registrados × Encerrados diário e por hora |
 | 4 | **Por Membro** | quantos chamados cada conta registrou e quantos encerramentos cada responsável tem — critério do fornecedor | por membro |
 | 5 | **Por Tipo** | evolução mensal de Incidentes e Solicitações, em Registrados e em Encerrados, e a tabela por tipo | detalhe de registrados, encerrados |
 | 6 | **Satisfação** | pesquisas de satisfação dos chamados encerrados | satisfação, detalhe |
@@ -56,8 +56,8 @@ As cinco páginas analíticas (2 a 6) usam estas consultas:
 |---|---|---|---|
 | `consulta_coi_registrados_detalhe_power_bi.sql` | 1 linha por SDM **registrado** | 30, entre elas `SDM`, `Categoria`, `Resumo`, `Item de Configuração`, `DataRegistroCOI`, `DataRegistro`, `HoraRegistro`, `Tipo`, `RegistradorNome`, `FormaRegistroCOI` | Visão Geral (cartão e tabela), Por Tipo |
 | `consulta_coi_encerrados_power_bi.sql` | 1 linha por SDM **encerrado** | 14: `SDM`, `Tipo Chamado`, `Símbolo` (categoria), `Resumo`, `Item de Configuração`, `Prioridade`, `Status`, `Código Status`, `Data de Abertura`, `Data de Encerramento`, `Data de Resolução`, `Responsável`, `Grupo Atual`, `UUID Grupo Atual` | Visão Geral (cartão e tabela), Por Tipo |
-| `consulta_coi_registrados_encerrados_diario_power_bi.sql` | 1 linha por **dia** do período, inclusive dias sem movimento | `Dia`, `Registrados`, `Encerrados` | Visão Geral (gráfico Ano → Mês → Dia) |
-| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `Registrados`, `Encerrados` | Por Hora |
+| `consulta_coi_registrados_encerrados_diario_power_bi.sql` | 1 linha por **dia** do período, inclusive dias sem movimento | `Dia`, `Registrados`, `Encerrados` | Visão Geral (gráfico Ano → Mês → Dia), Movimentação de Chamados (modalidade Por dia) |
+| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | 1 linha por **mês e hora** (24 por mês, inclusive zero) | `Ano`, `Mes`, `MesAno`, `Hora`, `HoraLabel`, `Registrados`, `Encerrados` | Movimentação de Chamados (modalidade Por hora) |
 | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | 1 linha por **mês e conta** com registro ou encerramento | `Ano`, `Mes`, `MesAno`, `MembroUUID`, `MembroUserID`, `Membro`, `TipoConta`, `Registrados`, `Encerrados`, `EncerradosComoResponsavel` | Por Membro |
 | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | 1 linha por SDM **encerrado**, com a pesquisa | `SDM`, `TipoChamado`, `DataEncerramento`, `Ano`, `Mes`, `MesAno`, `StatusSatisfacao`, `PerguntaAvaliada`, `RespostaSatisfacao`, `QtdPerguntasRespondidas`, `DataPesquisa`, `PesquisaSolicitada`, `QtdSolicitacoesPesquisa`, `DataSolicitacaoPesquisa`, `SolicitacaoPesquisa` | Satisfação |
 
@@ -271,7 +271,7 @@ texto é colado na etapa `Sql` da consulta correspondente (seção 7).
 |---|---|---|
 | `Chamados Registrados` | `consulta_coi_registrados_detalhe_power_bi.sql` | `DataRegistro` (data de `DataRegistroCOI`) |
 | `Chamados Encerrados` | `consulta_coi_encerrados_power_bi.sql` | `Data de Encerramento (dia)`, criada no Power Query |
-| `Movimentação Diária` | `consulta_coi_registrados_encerrados_diario_power_bi.sql` | `Dia` |
+| `Movimentação Diária` | `consulta_coi_registrados_encerrados_diario_power_bi.sql`; coluna calculada `Dia do mês` = `FORMAT(Dia, "dd")`, eixo do gráfico Por dia | `Dia` |
 | `Movimentação por Hora` | `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | `MesInicio` (dia 1 do mês da linha), criada no Power Query |
 | `Movimentação por Membro` | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | `MesInicio`, idem |
 | `Pesquisas de Satisfação` | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | `DataEncerramento (dia)`, criada no Power Query |
@@ -315,7 +315,8 @@ acompanhe cada atualização sem regravar o relatório.
 | `Última atualização` | `MAX(UltimaAtualizacao)` no formato `dd/mm/aaaa hh:mm` |
 | `Período exibido` e `Título …` | texto do mês ou do intervalo exibido, para os títulos dos visuais |
 | `AnoMes exibido`, `Mês exibido` | o mês das páginas de mês único: o selecionado ou, se não houver seleção, o **último mês carregado** — nunca todos os meses |
-| `Registrados por hora no mês`, `Encerrados por hora no mês` | as medidas por hora restritas ao mês exibido — página Por Hora |
+| `Registrados por dia no mês`, `Encerrados por dia no mês` | `Registrados no dia` e `Encerrados no dia` restritas ao mês exibido — modalidade Por dia da página Movimentação de Chamados |
+| `Registrados por hora no mês`, `Encerrados por hora no mês` | as medidas por hora restritas ao mês exibido — modalidade Por hora da página Movimentação de Chamados |
 | `Registrados por membro no mês`, `Encerrados por membro no mês` | as medidas por membro restritas ao mês exibido — página Por Membro; Encerrados por `EncerradosComoResponsavel` |
 | `Pesquisas respondidas no mês` | `Pesquisas respondidas` no mês exibido — cartão da página Satisfação, a mesma população da tabela |
 | `Avaliação no mês exibido` | 1 para o chamado encerrado no mês exibido — filtro da tabela da página Satisfação |
@@ -333,7 +334,7 @@ botões transparentes por cima, com a ação correspondente.
 |---|---|---|
 | Início | 6 áreas clicáveis (navegação) e o cartão **Última atualização** | — |
 | Visão Geral | cartões Registrados e Encerrados; **Gráfico**: colunas agrupadas `Registrados no dia` × `Encerrados no dia` com eixo Ano › Mês/Ano › Data (drill nativo); **Tabela**: Registrados (16 colunas, ordenada por `DataRegistroCOI`) ou Encerrados (11 colunas, ordenada por `Data de Encerramento`) — colunas abaixo | todos os meses ou um mês |
-| Por Hora | **Gráfico**: colunas `HoraLabel` (00h–23h) × `Registrados por hora no mês` **ou** × `Encerrados por hora no mês`; **Tabela**: Hora × Registrados × Encerrados, com total | um mês |
+| Movimentação de Chamados | seletor **Por dia \| Por hora** na caixa *Distribuição* do cabeçalho. **Por dia** — **Gráfico**: colunas `Dia do mês` (01 a 28, 29, 30 ou 31) × `Registrados por dia no mês` **ou** × `Encerrados por dia no mês`; **Tabela**: `Dia` × Registrados × Encerrados, com total. **Por hora** — **Gráfico**: colunas `HoraLabel` (00h–23h) × `Registrados por hora no mês` **ou** × `Encerrados por hora no mês`; **Tabela**: Hora × Registrados × Encerrados, com total | um mês |
 | Por Membro | **Tabela** única: `Membro` × `Registrados por membro no mês` × `Encerrados por membro no mês` (rótulo **Encerrados**), com total, ordenada por Registrados; todas as contas com movimento no mês, inclusive Fora do grupo COI | um mês |
 | Por Tipo | **Gráficos**, empilhados e na largura toda: colunas agrupadas Ano › Mês/Ano × `Registrados por tipo` (em cima) e × `Encerrados por tipo` (embaixo), com legenda `Tipo de Chamado[Tipo]`; **Tabela**: Tipo × Registrados × Encerrados | todos os meses ou um mês |
 | Satisfação | cartão **Pesquisas respondidas** (`Pesquisas respondidas no mês`); tabela das **avaliações registradas**: `SDM`, `DataEncerramento`, `TipoChamado`, `PesquisaSolicitada`, `RespostaSatisfacao`, `DataPesquisa`, com filtros do visual `StatusSatisfacao = Com satisfação` e `Avaliação no mês exibido = 1`; mensagem quando o mês não tem avaliação | um mês |
@@ -358,6 +359,54 @@ SQL, no Power Query e no modelo as colunas mantêm o nome técnico.
 - O que cada coluna de Registrados significa está em
   [`docs/coi-registrados-colunas.md`](../docs/coi-registrados-colunas.md).
 
+### Página Movimentação de Chamados
+
+A antiga página Por Hora, agora com duas distribuições. No menu superior e no cartão
+da Início ela se chama **Movimentação**; o título da página é **Movimentação de
+Chamados**. Os controles têm três níveis, cada um no seu lugar:
+
+| Nível | Botões | Onde (px, página 1280 × 720) | Efeito |
+|---|---|---|---|
+| 1. Distribuição | **Por dia \| Por hora** | caixa *Distribuição* do cabeçalho, ao lado da caixa *Mês/Ano*: botões em x 649 e 736, y 94, 84 × 27 | troca a distribuição temporal; mantém Gráfico/Tabela e o indicador escolhidos |
+| 2. Apresentação | **Gráfico \| Tabela** | canto superior direito do quadro, na linha y 160: x 878 e 956, 76 × 28 | troca o visual da distribuição ativa |
+| 3. Indicador | **Registrados \| Encerrados** | mesma linha, à direita, 12 px depois de Tabela: x 1044 (102 × 28) e 1148 (100 × 28), terminando em 1248 | só com Gráfico: uma série por vez; com Tabela fica oculto, porque a tabela mostra as duas |
+
+Os quatro botões de apresentação e indicador seguem a Visão Geral: mesma linha,
+altura 28, larguras 76/76 e 102/100, 2 px dentro de cada par; ativo e inativo de
+cada opção têm a mesma posição e o mesmo tamanho. Gráficos e tabelas ocupam x 58,
+y 204, 1194 × 486. A segmentação Mês/Ano da página tem **Seleção única**
+(`strictSingleSelect`), como Por Membro, Por Tipo e Satisfação. Seis estados, um indicador
+de exibição cada: `Por dia – Gráfico – Registrados`, `Por dia – Gráfico –
+Encerrados`, `Por dia – Tabela`, `Por hora – Gráfico – Registrados`, `Por hora –
+Gráfico – Encerrados` e `Por hora – Tabela`. Cada um controla os 26 visuais
+alternáveis da página (6 de conteúdo e 20 botões) com `suppressData` e
+`applyOnlyToTargetVisuals`: não mexe no filtro Mês/Ano, no menu nem nas outras
+páginas. Cada opção tem dois botões no mesmo lugar — o ativo, azul-violeta e sem
+ação, e o inativo, claro, que aciona o indicador —, e cada estado mostra só um de
+cada par. A página abre em **Por dia – Gráfico – Registrados**. O filtro Mês/Ano é
+um só para as duas distribuições.
+
+### Menu superior
+
+Fundo de cada página (PNG 4x do Figma) com botões transparentes de navegação por
+cima, na mesma geometria. Medidas do componente `COI/Navegação` no Figma, iguais
+no estado ativo (azul) e no inativo (branco), em largura fixa:
+
+| Item | Largura (px) | x na página |
+|---|---|---|
+| Início | 79 | 587 |
+| Visão Geral | 92 | 672 |
+| **Movimentação** | **108** | **770** |
+| Por Membro | 97 | 884 |
+| Por Tipo | 75 | 987 |
+| Satisfação | 86 | 1068 |
+| Documentação | 110 | 1160 |
+
+Todos com altura 32, `y` 20, espaço 6 entre itens, padding horizontal 14, raio 16 e
+DIN Medium 12; a largura de cada item é o rótulo (e o ícone, em Início) + 28 + 2. O
+menu termina em x 1270 em todas as páginas. O componente-base do botão
+(`COI/Navegação/Botão`) tem 67 × 32 fixos nos dois estados.
+
 ### Filtros e alternâncias
 
 - **Independentes.** Cada página tem a sua segmentação Mês/Ano, sem
@@ -367,7 +416,7 @@ SQL, no Power Query e no modelo as colunas mantêm o nome técnico.
   seleção de vários meses. **Limpar filtro** é um indicador que volta a Todos os
   meses. A opção existe como valor porque a seleção única do Power BI sempre
   escolhe um item: sem ela, a página abriria num mês.
-- **Por Hora, Por Membro e Satisfação** — **Seleção única** sobre
+- **Movimentação de Chamados, Por Membro e Satisfação** — **Seleção única** sobre
   `Mês/Ano (seleção)`, gravada em **Último mês completo**. **Limpar filtro** é um
   indicador que reaplica essa seleção. O padrão é dinâmico em duas camadas:
   1. o rótulo **Último mês completo** é recalculado a cada atualização — é sempre
@@ -379,8 +428,9 @@ SQL, no Power Query e no modelo as colunas mantêm o nome técnico.
 - **Por Tipo** — com todos os meses, os dois gráficos mostram a evolução mensal
   de Incidentes e Solicitações; com um mês, só esse mês, ainda por tipo. Gráficos
   e tabela seguem o mesmo filtro (interações padrão).
-- **Gráfico | Tabela** (Visão Geral, Por Hora, Por Tipo) e
-  **Registrados | Encerrados** (tabela da Visão Geral, gráfico de Por Hora) são
+- **Gráfico | Tabela** (Visão Geral, Movimentação de Chamados, Por Tipo),
+  **Registrados | Encerrados** (tabela da Visão Geral, gráficos de Movimentação de
+  Chamados) e **Por dia | Por hora** (Movimentação de Chamados) são
   indicadores de exibição: mostram e ocultam visuais, sem guardar dados, e não
   alteram o filtro. Os botões da opção ativa aparecem preenchidos em azul-violeta.
 

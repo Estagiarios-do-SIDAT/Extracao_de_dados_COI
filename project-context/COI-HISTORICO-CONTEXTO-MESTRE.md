@@ -26130,3 +26130,194 @@ sem consulta nativa). As demais tabelas mantiveram os dados de 04/11/2026.
 - Item de Configuração ficou com largura automática nas duas tabelas, como
   antes; valores muito longos de Resumo, Categoria e Item de Configuração
   continuam truncados com reticências na célula, e a tabela rola na horizontal.
+
+## 84. 2026-11-09 — página Movimentação de Chamados: Por dia e Por hora na mesma página; menu "Movimentação" com dimensões fixas
+
+### 84.1. Pedido e decisões
+
+O gerente pediu os indicadores **por dia**. A distribuição diária entrou na
+**mesma página** que já mostrava a distribuição por hora — não há oitava página.
+A nomenclatura passou por uma etapa intermediária ("Por Dia e Hora" / "Dia e
+Hora") e ficou, por decisão do usuário:
+
+| Onde | Nome |
+|---|---|
+| Menu superior | **Movimentação** |
+| Cartão da página Início | **Movimentação** |
+| Título da página | **Movimentação de Chamados** |
+| Seletor interno | **Por dia \| Por hora** |
+
+Nada de SQL, regra de Registrados ou Encerrados, grupo alvo, parâmetro
+`QtdMesesCompletosCOI` ou piso de 01/03/2026 mudou.
+
+### 84.2. Ponto de partida e proteção dos arquivos
+
+- Versão mais recente: `Painéis\COI\painel-coi.pbix` de 05/11/2026 10:21, com
+  ajustes manuais do usuário posteriores à seção 83 (indicadores "Limpar filtro"
+  recapturados, estado inicial Gráfico em várias páginas, larguras da tabela de
+  Registrados reduzidas, ícone desligado num botão de Por Tipo). Todos foram
+  preservados. O projeto `.pbip` externo (`FAIA FARC\painel`) estava em 04/11.
+- Cópias de segurança antes de qualquer alteração:
+  `FAIA FARC\painel-backup-2026-11-09` (projeto inteiro, 149 arquivos) e
+  `Painéis\COI\painel-coi_backup-2026-11-09.pbix` (idêntico ao `.pbix` de 05/11).
+- O `.pbix` de 05/11 foi salvo como `.pbip` **sobre** o projeto externo, para
+  atualizá-lo. O Power BI perguntou se substituía `painel-coi.pbip`; a resposta
+  foi Sim, depois do backup acima, e o relatório salvo conferiu com o `.pbix` de
+  05/11 em 113 de 113 arquivos. Por orientação do usuário, nenhuma outra
+  substituição foi autorizada daí em diante.
+- O `.pbix` final tem nome novo e não substituiu nenhum arquivo; o `painel-coi.pbix`
+  de 05/11 e a cópia sincronizada com o SharePoint (`Tribunal de Contas da União\…
+  \Painéis\COI`) ficaram intactos. Decision, Protect4 e Virtual não foram tocados.
+
+### 84.3. Dados: Movimentação Diária, sem SQL novo
+
+A modalidade Por dia usa a tabela `Movimentação Diária` (consulta
+`consulta_coi_registrados_encerrados_diario_power_bi.sql`), que já tem um dia
+por linha, inclusive sem movimento, e se liga ao `Calendário COI` por `Dia`.
+Acréscimos ao modelo, só de apresentação:
+
+| Objeto | Definição |
+|---|---|
+| coluna calculada `Movimentação Diária[Dia do mês]` | `FORMAT ( 'Movimentação Diária'[Dia], "dd" )` — eixo 01–31 do gráfico |
+| `Registrados por dia no mês` | `VAR m = [AnoMes exibido] RETURN CALCULATE ( [Registrados no dia], 'Calendário COI'[AnoMes] = m )` |
+| `Encerrados por dia no mês` | idem, com `[Encerrados no dia]` |
+| `Título Registrados por dia`, `Título Encerrados por dia`, `Título Por Dia tabela` | `"… por dia · Mês: " & [Mês exibido]`, como os títulos por hora |
+
+As medidas seguem o padrão das "… por hora no mês": sem seleção, valem para o
+último mês carregado, nunca para a soma dos meses.
+
+### 84.4. Página no Power BI
+
+- Página `ae9b2ea6c379757ea18e` renomeada para **Movimentação de Chamados**;
+  visuais de Por hora preservados.
+- Novos visuais: gráfico de colunas Registrados por dia, gráfico Encerrados por
+  dia (ambos `Dia do mês` × medida "… por dia no mês") e tabela `Dia` ×
+  Registrados × Encerrados com total — cópias dos visuais por hora.
+- Controles em três níveis:
+
+| Nível | Botões | Posição (px) |
+|---|---|---|
+| 1. Distribuição | Por dia \| Por hora | caixa *Distribuição* do cabeçalho: x 649 e 736, y 94, 84 × 27 |
+| 2. Apresentação | Gráfico \| Tabela | linha y 160: x 878 e 956, 76 × 28 |
+| 3. Indicador | Registrados \| Encerrados | mesma linha: x 1044 (102 × 28) e 1148 (100 × 28); só com Gráfico |
+
+- Os quatro botões dos níveis 2 e 3 ficam numa linha só, no padrão da Visão
+  Geral (altura 28, larguras 76/76 e 102/100, 2 px dentro de cada par), com 12 px
+  entre os pares e o conjunto terminando em x 1248. Numa etapa intermediária
+  Registrados | Encerrados chegou a ficar numa 2ª linha; o usuário pediu a linha
+  única, como nas outras páginas. Com Tabela, Registrados | Encerrados fica
+  oculto e Gráfico | Tabela não muda de lugar.
+- Gráficos e tabelas em x 58, y 204, 1194 × 486 — a área original de Por Hora.
+- Segmentação Mês/Ano da página: **Seleção única** ativada
+  (`strictSingleSelect = true`, `singleSelect = true`, sem "Selecionar tudo"),
+  a mesma configuração de Por Membro, Por Tipo e Satisfação, conferida no arquivo
+  do relatório e no Desktop; as outras páginas não foram alteradas.
+- Seis indicadores de exibição — `Por dia – Gráfico – Registrados`, `Por dia –
+  Gráfico – Encerrados`, `Por dia – Tabela`, `Por hora – Gráfico – Registrados`,
+  `Por hora – Gráfico – Encerrados`, `Por hora – Tabela` —, os três de Por hora
+  renomeados e ampliados, os três de Por dia novos. Cada um controla os 26
+  visuais alternáveis da página (6 de conteúdo, 20 botões), com `suppressData`,
+  `applyOnlyToTargetVisuals` e `suppressActiveSection`: não tocam o filtro, o menu
+  nem outras páginas. Cada opção tem um botão ativo (azul-violeta, sem ação) e um
+  inativo (claro, com ação) no mesmo lugar; trocar de distribuição mantém
+  apresentação e indicador. A página abre em Por dia – Gráfico – Registrados.
+- Um só filtro Mês/Ano (`Mês/Ano (seleção)`, seleção única, padrão Último mês
+  completo), o mesmo de antes; o indicador "Limpar filtro" da página não mudou.
+- Menu: botões transparentes das 6 páginas com menu reposicionados na geometria
+  do Figma (84.5). Fundos das 7 páginas trocados pelos PNG 4x novos.
+
+### 84.5. Figma (página COI)
+
+- **Menu superior** (`COI/Navegação`): só o item Por Hora mudou — rótulo
+  **Movimentação**, largura **108 px** (rótulo de 78 px + 28 de padding + 2, a
+  mesma regra dos demais itens) — e o menu foi deslocado 21 px para a esquerda em
+  cada frame para continuar terminando em x 1270. Medidas conferidas nos 7
+  variantes, iguais no estado ativo (azul) e no inativo (branco), todas fixas:
+
+| Item | Largura | x no menu | x na página |
+|---|---|---|---|
+| Início | 79 | 0 | 587 |
+| Visão Geral | 92 | 85 | 672 |
+| Movimentação | 108 | 183 | 770 |
+| Por Membro | 97 | 297 | 884 |
+| Por Tipo | 75 | 400 | 987 |
+| Satisfação | 86 | 481 | 1068 |
+| Documentação | 110 | 573 | 1160 |
+
+  Altura 32, espaço 6, padding 14, raio 16, DIN Medium 12, contorno interno de 1
+  px (não altera a área). No item Movimentação, rótulo em x 15 e folga direita de
+  15 px nos dois estados. O componente-base `COI/Navegação/Botão` usava largura
+  automática ("hug") e media 65 px ativo e 67 px inativo; passou a **67 × 32
+  fixos** nos dois estados. Cores, fontes, espaçamentos e os demais botões ficaram
+  como o usuário deixou; o único override das instâncias do menu (o nome da
+  camada) foi preservado.
+- **Frame da página** (antigo "Por Hora"): nome e título **Movimentação de
+  Chamados**; subtítulo da distribuição por dia ou por hora; caixa
+  **Distribuição** (201 × 65 em x 633, y 66, raio 12, contorno #DCDCDC, rótulo DIN
+  Bold 11 — o padrão da caixa Mês/Ano) com a área reservada aos botões nativos;
+  só o título "Distribuição", sem texto auxiliar: o "por dia ou por hora" que
+  chegou a acompanhá-lo foi retirado por ser redundante com os botões;
+  título e subtítulo do quadro genéricos; área do visual em y 204, como antes.
+  Nada de gráfico no fundo.
+- **Prévias** (ocultas na exportação): componente novo `COI/Por Dia — Conteúdo`
+  (Gráfico – Registrados, Gráfico – Encerrados e Tabela, com 31 dias e valores
+  ilustrativos), componente novo `COI/Seletor Por dia-Por hora`; nas prévias por
+  hora e por dia, Gráfico | Tabela e Registrados | Encerrados ficam na mesma
+  linha, 12 px entre os grupos, como no painel.
+- **Início**: cartão `Página=Movimentação` — título "Movimentação", subtítulo "Por
+  dia e por hora", descrição "Em que dia do mês e em que hora do dia os chamados
+  entram no COI e são encerrados." O botão continua levando à mesma página.
+- Os sete frames mantêm 1280 × 720 e as posições; nada ultrapassa os limites.
+  Fundos reexportados em PNG 4x (5120 × 2880): os 7 (o menu aparece em 6, o
+  cartão na Início).
+
+### 84.6. Documentação
+
+`README.md`, `docs/coi-calculation.md` (seção 7: a série diária na página),
+`powerbi/powerbi-query.md` (páginas, consultas, modelo, medidas, a página
+Movimentação de Chamados com os três níveis e as posições, o menu com as
+medidas) e `powerbi/documentacao-powerbi-coi.html` (tabelas, páginas, filtros e
+um bloco sobre a página: as duas distribuições, os controles, o filtro comum, as
+datas e como ler). A página Documentação do painel foi regerada a partir desse
+HTML.
+
+### 84.7. Testes
+
+| Teste | Resultado |
+|---|---|
+| set/2026 (30 dias) | 30 dias (01–30); soma dos dias = soma das 24 horas = detalhe = 3.723 Registrados e 453 Encerrados; SDMs distintos 3.723; nenhuma data fora do mês |
+| out/2026 (31 dias) | 31 dias (01–31); 3.818 e 522 nas três contas |
+| Sem seleção de mês | só o último mês carregado (out/2026, 31 dias, 3.818), nunca a soma |
+| Seis estados (arquivos) | cada indicador mostra o conteúdo e os botões ativos do seu rótulo; cada botão leva ao estado do seu rótulo; nenhum par de botões visível se sobrepõe |
+| Seis estados (Power BI Desktop) | Por dia/Por hora × Registrados/Encerrados/Tabela com os títulos certos, no projeto e no `.pbix` reaberto |
+| Filtro | set/2026 escolhido em Por hora – Tabela continua em Por dia – Tabela (3.723 / 453); Limpar filtro volta ao Último mês completo |
+| Sete páginas | abrem sem erro; Documentação com o texto novo; Início com o cartão Movimentação |
+| Modelo do `.pbix` final | 37 medidas (32 + 5), 9 relacionamentos, 111 colunas (110 + 1); dados de 04/11/2026 |
+| Linha única | nos estados Gráfico de Por dia e de Por hora, Gráfico \| Tabela e Registrados \| Encerrados na linha y 160, altura 28; ativo e inativo de cada opção com a mesma posição e tamanho (878/956 × 76; 1044 × 102; 1148 × 100) |
+| Seleção única | Mês/Ano com `strictSingleSelect`; escolher set/2026 e depois ago/2026 deixa só ago/2026 selecionado |
+| Mês entre distribuições | set/2026 escolhido em Por dia – Gráfico continua em Por hora – Gráfico e Por hora – Tabela; Limpar filtro volta a out/2026 |
+| Caixa Distribuição | sem o texto "por dia ou por hora"; título, caixa e botões nas mesmas posições; seletor funcionando |
+
+### 84.8. Arquivos
+
+- Projeto externo atualizado: `FAIA FARC\painel\painel-coi.pbip`.
+- `.pbix` final: `FAIA FARC\Painéis\COI\painel-coi-movimentacao-2026-11-09-v2.pbix`
+  (5.297.667 bytes), salvo com o tipo "Arquivo do Power BI (*.pbix)" conferido
+  antes do clique, sem nenhum diálogo de substituição; ZIP íntegro com
+  `DataModel`, nenhum arquivo de projeto dentro, relatório igual ao do projeto
+  externo em 131 arquivos, sete páginas, reaberto e conferido.
+- `painel-coi-movimentacao-2026-11-09.pbix` (14:39) é uma versão intermediária,
+  com Registrados | Encerrados numa 2ª linha e o texto auxiliar na caixa
+  Distribuição; ficou na pasta, sem uso. O v2 foi salvo de novo às 14:59, pelo
+  próprio Desktop, só para que a página abra em Por dia – Gráfico – Registrados.
+
+### 84.9. Limitações
+
+- Os botões da tela não são clicáveis pela automação no modo de edição do
+  Desktop. As trocas foram testadas pelos indicadores de exibição e pela
+  conferência, nos arquivos, de que cada botão aciona o indicador do seu rótulo; a
+  navegação da Início e do menu, pela conferência do destino de cada botão e da
+  sua posição sobre o fundo.
+- O menu dos fundos mostra "Movimentação", e a aba da página no Desktop mostra
+  "Movimentação de Chamados", por decisão de nomenclatura.
+- A cópia do painel na pasta sincronizada com o SharePoint não foi atualizada.

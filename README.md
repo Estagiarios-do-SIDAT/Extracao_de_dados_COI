@@ -101,7 +101,7 @@ Com a mesma população e a mesma conferência do grupo alvo:
 
 ### Painel
 
-O painel tem sete páginas: **Início** (navegação e última atualização), **Visão Geral**, **Por Hora**, **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**. O projeto do Power BI (`painel-coi.pbip`: modelo, relatório e os fundos das páginas, exportados do Figma) é mantido **fora deste repositório**; aqui ficam as consultas SQL que ele usa e a documentação. A montagem das páginas está na seção 6 de [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md).
+O painel tem sete páginas: **Início** (navegação e última atualização), **Visão Geral**, **Movimentação de Chamados** (no menu, *Movimentação*: distribuição por dia do mês e por hora do dia), **Por Membro**, **Por Tipo**, **Satisfação** e **Documentação**. O projeto do Power BI (`painel-coi.pbip`: modelo, relatório e os fundos das páginas, exportados do Figma) é mantido **fora deste repositório**; aqui ficam as consultas SQL que ele usa e a documentação. A montagem das páginas está na seção 6 de [`powerbi/powerbi-query.md`](powerbi/powerbi-query.md).
 
 A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o nome da sua referência em `queries/` acrescido de `_power_bi`:
 
@@ -109,8 +109,8 @@ A pasta `powerbi/` tem **só as 6 consultas que o painel usa**, cada uma com o n
 |---|---|
 | `consulta_coi_registrados_detalhe_power_bi.sql` | Visão Geral, Por Tipo |
 | `consulta_coi_encerrados_power_bi.sql` | Visão Geral, Por Tipo |
-| `consulta_coi_registrados_encerrados_diario_power_bi.sql` | Visão Geral |
-| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | Por Hora |
+| `consulta_coi_registrados_encerrados_diario_power_bi.sql` | Visão Geral, Movimentação de Chamados (modalidade Por dia) |
+| `consulta_coi_registrados_encerrados_por_hora_power_bi.sql` | Movimentação de Chamados (modalidade Por hora) |
 | `consulta_coi_registrados_encerrados_por_membro_power_bi.sql` | Por Membro |
 | `consulta_coi_pesquisa_satisfacao_encerrados_detalhe_power_bi.sql` | Satisfação |
 
